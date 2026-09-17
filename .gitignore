@@ -1,3 +1,6 @@
 .env
 *.local
 /tmp/
+
+# repomix packed-repo output (config itself stays committable)
+repomix-output.*
