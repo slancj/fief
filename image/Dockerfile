@@ -16,7 +16,7 @@ RUN wget -q -O /tmp/chisel.gz \
  && rm /tmp/chisel.gz /tmp/checksums.txt \
  && chisel --version
 
-COPY entrypoint.sh /entrypoint.sh
+COPY image/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 EXPOSE 10000
