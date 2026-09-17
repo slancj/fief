@@ -19,7 +19,9 @@ services:
     # Full binary path with literal values only. The image has no shell,
     # so this runs WITHOUT expansion: no $VARs, pipes, redirects, or quotes.
     # Bake the real auth at deploy time — never commit the real value.
-    dockerCommand: /ko-app/chisel server --port 10000 --reverse --auth CHISEL_AUTH_PLACEHOLDER --keepalive 25s
+    # --socks5 exposes the SERVER-side proxy (Render egress) to forward
+    # `socks` remotes; --reverse keeps Windows R:socks working. Both coexist.
+    dockerCommand: /ko-app/chisel server --port 10000 --reverse --socks5 --auth CHISEL_AUTH_PLACEHOLDER --keepalive 25s
     envVars:
       - key: CHISEL_AUTH
         sync: false # dashboard secret; reference for clients, not read by the command above

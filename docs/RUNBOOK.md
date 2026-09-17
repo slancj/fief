@@ -15,6 +15,15 @@ leftover generic hub image from the Hugging Face attempt.
    Expect `tun: proxy#1080=>1080: Listening` then `Connected`.
 3. Use it: `proxychains xfreerdp /v:<windows-lan-ip> /u:<user>`
    (or `proxychains curl http://<lan-ip>/` to smoke-test).
+   `proxychains` must point at port `1080` for LAN exits.
+
+## Unblocked internet via Render egress
+
+The hub also runs `--socks5`, so a second local port exits through
+Render's connection instead of Windows:
+`curl -x socks5h://127.0.0.1:1081 ifconfig.me` shows a Render Oregon IP.
+`linux/chisel-forward.sh` opens both (`1080` = LAN, `1081` = egress).
+Point a second proxychains profile (or `curl -x`) at `1081` for browsing.
 
 ## Notes
 
