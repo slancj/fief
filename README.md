@@ -17,7 +17,7 @@ from a free cloud relay — no inbound ports, no kernel drivers.
 * `windows/run-chisel.ps1` — Windows client with reconnect loop
 * `linux/chisel-forward.sh` — Linux forwards (`1080` LAN, `1081` egress)
 * `docs/RUNBOOK.md` — start order, healthy logs, gotchas
-* `Dockerfile` — generic hub image (legacy, not what Render runs)
+* `image/` — hub image (Alpine + pinned chisel, env-driven entrypoint)
 
 ## Quickstart
 

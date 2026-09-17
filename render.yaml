@@ -1,27 +1,17 @@
-# Spider hub — reproducible copy of the live Render service.
-#
-# Live service (created via API, deploys fine without this file):
-#   name:  spider-chisel (srv-dalvfj61egvs73800lq0)
-#   image: docker.io/jpillora/chisel:1.12.1 (distroless, entrypoint /ko-app/chisel)
-#   url:   https://spider-chisel.onrender.com
-#
-# NOTE: applying this blueprint requires the workspace to have GitHub
-# linked. Until then, the dashboard/API state is authoritative and this
-# file is documentation. Keep them in sync by hand.
+# fief-relay hub — deployed from this repo via Blueprint.
+# Apply: dashboard → New → Blueprint → slancj/fief (workspace needs
+# GitHub connected). Set CHISEL_AUTH at apply time; it is never committed.
 services:
   - type: web
-    name: spider-chisel
-    runtime: image
+    name: fief-relay
+    runtime: docker
     plan: free # sleeps after ~15 min idle; first connect wakes it (~30s cold start)
     region: oregon
-    image:
-      url: docker.io/jpillora/chisel:1.12.1
-    # Full binary path with literal values only. The image has no shell,
-    # so this runs WITHOUT expansion: no $VARs, pipes, redirects, or quotes.
-    # Bake the real auth at deploy time — never commit the real value.
-    # --socks5 exposes the SERVER-side proxy (Render egress) to forward
-    # `socks` remotes; --reverse keeps Windows R:socks working. Both coexist.
-    dockerCommand: /ko-app/chisel server --port 10000 --reverse --socks5 --auth CHISEL_AUTH_PLACEHOLDER --keepalive 25s
+    dockerfilePath: ./image/Dockerfile
+    dockerContext: .
+    # No dockerCommand override: image/entrypoint.sh reads $PORT (injected
+    # by Render) and $CHISEL_AUTH and execs chisel server with
+    # --reverse (Windows R:socks) + --socks5 (Render-egress proxy).
     envVars:
       - key: CHISEL_AUTH
-        sync: false # dashboard secret; reference for clients, not read by the command above
+        sync: false # dashboard secret, format user:secret
