@@ -1,0 +1,20 @@
+# fief gitleaks config: all default detectors plus rules shaped like our
+# real secrets (hub auth, Render API key, HF token). Scan with:
+#   gitleaks detect --source . --config gitleaks.toml
+[extend]
+useDefault = true
+
+[[rules]]
+description = "fief hub credential (CHISEL_AUTH value)"
+id = "fief-auth"
+regex = '''fief:[A-Za-z0-9_\-]{8,}'''
+
+[[rules]]
+description = "Render API key"
+id = "render-api-key"
+regex = '''rnd_[A-Za-z0-9]{16,}'''
+
+[[rules]]
+description = "Hugging Face token"
+id = "hf-token"
+regex = '''hf_[A-Za-z0-9]{16,}'''

@@ -1,0 +1,9 @@
+# Secret scanning on every commit. Install once per clone:
+#   pre-commit install
+# (get pre-commit via: nix-shell -p pre-commit, pipx install pre-commit, ...)
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+        args: ["--config", "gitleaks.toml"]

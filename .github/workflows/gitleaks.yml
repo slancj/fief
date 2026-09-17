@@ -1,0 +1,17 @@
+# Backstop for machines without the pre-commit hook: fail the build if any
+# secret (per gitleaks.toml) appears anywhere in git history.
+name: gitleaks
+on: [push, pull_request]
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks v8.30.1
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz" \
+            | tar xz -C /tmp gitleaks
+      - name: Scan git history
+        run: /tmp/gitleaks detect --source . --config gitleaks.toml --verbose
