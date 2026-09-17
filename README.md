@@ -28,3 +28,4 @@ cp .env.example .env   # put real CHISEL_AUTH in .env, never commit it
 1. Windows: `powershell -ExecutionPolicy Bypass -File windows/run-chisel.ps1`
 2. Linux: `CHISEL_AUTH='...' linux/chisel-forward.sh`
 3. `proxychains xfreerdp /v:<windows-lan-ip> /u:<user>`
+4. `ssh -p 2222 fief@127.0.0.1` — shell on the hub (needs `SSH_PUBKEY` set on the service)

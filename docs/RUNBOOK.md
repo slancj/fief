@@ -25,6 +25,19 @@ Render's connection instead of Windows:
 `linux/chisel-forward.sh` opens both (`1080` = LAN, `1081` = egress).
 Point a second proxychains profile (or `curl -x`) at `1081` for browsing.
 
+## Shell on the hub via chisel
+
+The image also runs `sshd` (key-only, user `fief`, container port 2222)
+when the `SSH_PUBKEY` env var is set on the service. `linux/chisel-forward.sh`
+maps it to localhost:2222:
+
+```sh
+ssh -p 2222 fief@127.0.0.1
+```
+
+Host keys regenerate on every deploy, so expect a changed-host-key prompt
+after each hub update. `SSH_PUBKEY` unset = sshd stays off, chisel-only.
+
 ## Notes
 
 * Local forwards are bare `local:remote` — no `L:` prefix (it parses
