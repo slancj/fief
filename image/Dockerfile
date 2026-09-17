@@ -19,6 +19,15 @@ RUN wget -q -O /tmp/chisel.gz \
 COPY image/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# sshd for `ssh -p 2222 fief@127.0.0.1` over the chisel tunnel.
+# Key-only: entrypoint installs $SSH_PUBKEY at boot; no passwords.
+RUN apk add --no-cache openssh \
+  && adduser -D -s /bin/sh fief \
+  && passwd -u fief \
+  && mkdir -p /home/fief/.ssh /root/.ssh \
+  && chmod 700 /home/fief/.ssh /root/.ssh \
+  && chown fief:fief /home/fief/.ssh
+
 EXPOSE 10000
 
 ENTRYPOINT ["/entrypoint.sh"]
