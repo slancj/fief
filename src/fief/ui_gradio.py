@@ -2,7 +2,27 @@
 
 from __future__ import annotations
 
+import inspect
 from collections.abc import Callable
+
+
+def launch_demo(demo: object, *, server_name: str, server_port: int) -> None:
+    """Launch a Blocks demo, dropping kwargs the installed Gradio lacks.
+
+    Gradio 6 removed e.g. ``show_api``; signature-filtering keeps this
+    working on both 5.x and 6.x without version parsing.
+    """
+    launch = demo.launch  # type: ignore[attr-defined]
+    try:
+        params = inspect.signature(launch).parameters.values()
+        accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params)
+        names = {p.name for p in params}
+    except (TypeError, ValueError):
+        accepts_kwargs, names = False, set()
+    extras = {"prevent_thread_lock": True, "show_api": False}
+    if not accepts_kwargs:
+        extras = {k: v for k, v in extras.items() if k in names}
+    launch(server_name=server_name, server_port=server_port, **extras)
 
 
 def build_ui(

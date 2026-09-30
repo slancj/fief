@@ -97,18 +97,13 @@ def start_backend(
     cfg: HubConfig, ui: str, hub_url: str, port_override: str | None = None
 ) -> None:
     if ui == "gradio":
-        from .ui_gradio import build_ui
+        from .ui_gradio import build_ui, launch_demo
 
         demo = build_ui(bool(cfg.auth), hub_url, lambda: snapshot(cfg, hub_url))
         if not cfg.auth:
-            demo.launch(server_name="0.0.0.0", server_port=int(cfg.port))  # type: ignore[attr-defined]
+            launch_demo(demo, server_name="0.0.0.0", server_port=int(cfg.port))
             return
-        demo.launch(  # type: ignore[attr-defined]
-            server_name="127.0.0.1",
-            server_port=int(cfg.backend_port),
-            prevent_thread_lock=True,
-            show_api=False,
-        )
+        launch_demo(demo, server_name="127.0.0.1", server_port=int(cfg.backend_port))
     else:  # basic stdlib status page
         serve_status(
             int(port_override or cfg.backend_port),
