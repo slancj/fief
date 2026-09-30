@@ -1,0 +1,8 @@
+# SOPS creation rules: everything under config/secrets.yaml is encrypted
+# with age. Replace the recipient below with YOUR age public key
+# (generate: `age-keygen` / `nix-shell -p age --run age-keygen`).
+# Public key is safe to commit; the PRIVATE key goes to GitHub secret
+# SOPS_AGE_KEY + host key files (gitignored, see .gitignore).
+creation_rules:
+  - path_regex: config/secrets\.yaml$
+    age: AGE_PUBLIC_KEY_PLACEHOLDER

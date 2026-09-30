@@ -32,6 +32,9 @@ Raspberry Pi (`compose.yaml`), or any Docker host / Linux box.
 * `render.yaml` — hub as code (image + start command, secrets via dashboard)
 * `hf-space/` — Gradio Space shim + card (payload assembled by CI)
 * `scripts/assemble_hf_space.py` — vendor `src/fief` into a Space payload
+* `scripts/fanout.py` — push `config/` secrets+vars to HF/Render (CI)
+* `config/nodes.toml` + `config/secrets.yaml` (encrypted) — the one place:
+  all topology and secrets; see `docs/RUNBOOK.md`
 * `docs/RUNBOOK.md` — start order, healthy logs, gotchas
 
 ## Quickstart

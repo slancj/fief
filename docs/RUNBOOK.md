@@ -1,5 +1,30 @@
 # fief runbook (minimal)
 
+## One place: config/ + fan-out (read this first)
+
+All config lives in git: `config/nodes.toml` (plaintext topology per node)
++ `config/secrets.yaml` (**SOPS+age encrypted** — opaque blob, safe to
+commit). Nothing secret lives in dashboards, `.env` files, or chat.
+
+* **Edit**: `sops config/secrets.yaml` (needs age key; bootstrap below).
+* **Rotate**: edit → commit → push. CI fans out to HF Space + Render in
+  ~1 min (Render redeploys so env applies; Space restarts). Hosts
+  (Pi/laptop): `git pull`, then `fief config export --node <name> > .env`,
+  restart services.
+* **Dry run**: Actions → `fanout` → Run workflow with dry_run (prints
+  keys/targets, never values).
+* **Root secrets** (the only manual ones, they authenticate the fan-out
+  itself): GitHub `SOPS_AGE_KEY`, `HF_TOKEN`, `RENDER_API_KEY`
+  (+ `HF_SPACE_ID`, `RENDER_SERVICE_ID` variables). Age private key also
+  lives at `~/.config/fief/age.key` on hosts. Tailscale key creation and
+  route/exit approvals stay in the Tailscale console.
+
+Bootstrap (once): `age-keygen` → public key into `.sops.yaml`
+(replacing the placeholder) → private key to GitHub `SOPS_AGE_KEY` + host
+key files → `cp config/secrets.example.yaml config/secrets.yaml`, fill in,
+`sops config/secrets.yaml` (encrypts in place), commit, push.
+Fan-out refuses plaintext (sops-envelope guard) and gitleaks scans history.
+
 Hub: `fief hub` — chisel `server --reverse --socks5` on `$PORT` (default
 8080; Render injects its own, HF shim uses 7860). Normal browser HTTP on the
 same port is proxied via `--backend` to the status UI (Gradio when installed,

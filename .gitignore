@@ -1,9 +1,38 @@
+# Local / secret / generated — NEVER committed.
+# The single source of truth is config/nodes.toml (plaintext topology) +
+# config/secrets.yaml (SOPS+age ENCRYPTED). Decrypted material, key files,
+# and rendered env files must never reach git. Gitleaks + the fanout
+# sops-envelope guard are backstops, not substitutes for this file.
+
+# Rendered environments (generate via `fief config export --node <n> > .env`)
 .env
+.env.*
+!.env.example
 *.local
+
+# Age / SOPS key material (private keys live in password manager / host disk only)
+*age.key*
+*.agekey
+agekey.txt
+age_key.txt
+keys/
+.sops-age/
+SOPS_AGE_KEY
+sops-age-key*
+
+# Decrypted / plaintext secret copies
+*.decrypted.*
+*.plain.*
+secrets.plain.*
+config/*.decrypted.*
+config/*.plain.*
+
+# Build / runtime / tooling
 /tmp/
 .venv/
 dist/
 __pycache__/
+*.pyc
 
 # repomix packed-repo output (config itself stays committable)
 repomix-output.*

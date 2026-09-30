@@ -1,0 +1,54 @@
+# Fan out config/ (nodes.toml + sops secrets.yaml) to HF Space + Render.
+# Rotation = edit secrets via `sops config/secrets.yaml`, commit, push.
+# Values are NEVER logged (keys/targets only). No-op until config/secrets.yaml
+# exists (see RUNBOOK one-place bootstrap).
+name: fanout
+on:
+  push:
+    branches: [main]
+    paths:
+      - "config/**"
+      - "scripts/fanout.py"
+      - ".github/workflows/fanout.yml"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Plan only (print keys/targets, change nothing)"
+        type: boolean
+        default: false
+
+jobs:
+  fanout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install sops
+        env:
+          SOPS_VERSION: v3.10.2
+        run: |
+          curl -fsSL "https://github.com/mozilla/sops/releases/download/${SOPS_VERSION}/sops-${SOPS_VERSION}.linux.amd64" -o /tmp/sops
+          chmod +x /tmp/sops
+          /tmp/sops --version
+          # No detached checksum published upstream; version pin over HTTPS
+          # from the official repo is the anchor (revisit if that changes).
+      - name: Decrypt secrets
+        id: decrypt
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          if [ ! -f config/secrets.yaml ]; then
+            echo "no config/secrets.yaml yet — see RUNBOOK one-place bootstrap"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          /tmp/sops --decrypt --output-type json config/secrets.yaml > "$RUNNER_TEMP/secrets.json"
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Fan out
+        if: steps.decrypt.outputs.ready == 'true'
+        env:
+          SECRETS_JSON: ${{ runner.temp }}/secrets.json
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
+        run: python scripts/fanout.py ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}
