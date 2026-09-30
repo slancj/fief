@@ -10,7 +10,7 @@
 [nodes.hf]
 # Hugging Face Space hub. Secrets -> Space Secrets, vars -> Variables.
 vars = { FIEF_MESH_HOSTNAME = "fief-hf", FIEF_MESH_SERVE = "1080,1081" }
-secrets = ["CHISEL_AUTH", "SSH_PUBKEY"]
+secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.render]
 # Render web service (fief-relay). Secrets+vars -> service env (PUT per key).
