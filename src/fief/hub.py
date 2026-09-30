@@ -8,6 +8,7 @@ With ui=none no --backend is passed and chisel serves /health itself.
 
 from __future__ import annotations
 
+import os
 import signal
 import subprocess
 import threading
@@ -111,6 +112,19 @@ def start_backend(
         )
 
 
+def _maybe_start_tail() -> None:
+    """Tailnet sidecar in a background thread (hub keeps owning the foreground)."""
+    if not os.environ.get("TAILSCALE_AUTHKEY", ""):
+        return
+    from . import tail as tail_mod
+
+    LOG.log("tailnet sidecar enabled (TAILSCALE_AUTHKEY set)")
+    thread = threading.Thread(
+        target=tail_mod.run_node, kwargs={"log": LOG.log}, daemon=True
+    )
+    thread.start()
+
+
 def snapshot(cfg: HubConfig, hub_url: str) -> tuple[str, str]:
     return status_text(cfg, hub_url), LOG.snapshot()
 
@@ -143,6 +157,7 @@ def main(cfg: HubConfig | None = None) -> int:
             return 1
 
     maybe_start_sshd(cfg.ssh_pubkey, cfg.ssh_port, cfg.ssh_user, log=LOG.log)
+    _maybe_start_tail()
     binary = ensure_chisel(cfg.version, log=LOG.log)
 
     backoff = 5

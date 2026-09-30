@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import gzip
-import hashlib
 import io
 import os
 import platform
 import shutil
 import stat
 import subprocess
-import urllib.request
 from collections.abc import Callable
 from pathlib import Path
+
+from .fetch import fetch, verify_sha256
 
 MACHINE_TO_ARCH = {
     "x86_64": "amd64",
@@ -60,12 +60,6 @@ def parse_checksum(sums_text: str, gz_name: str) -> str | None:
     return None
 
 
-def fetch(url: str, timeout: int = 120) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "fief-relay"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return resp.read()
-
-
 def default_bin_dir() -> Path:
     override = os.environ.get("FIEF_BIN_DIR")
     if override:
@@ -103,9 +97,7 @@ def ensure_chisel(
     want = parse_checksum(sums, gz_name)
     if not want:
         raise RuntimeError("checksum entry not found for " + gz_name)
-    got = hashlib.sha256(gz_data).hexdigest()
-    if got != want:
-        raise RuntimeError(f"checksum mismatch: {got} != {want}")
+    got = verify_sha256(gz_data, want, gz_name)
     with gzip.open(io.BytesIO(gz_data), "rb") as src, open(target, "wb") as dst:
         shutil.copyfileobj(src, dst)
     target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)

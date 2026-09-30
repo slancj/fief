@@ -49,6 +49,34 @@ without root. Set `SSH_USER` to change the name on root-run (Docker) hubs.
 Host keys regenerate on every deploy, so expect a changed-host-key prompt
 after each hub update. `SSH_PUBKEY` unset = sshd stays off, chisel-only.
 
+## Tailnet (all nodes join)
+
+Every fief node can be a tailnet node: hubs (Render/HF/Docker) via the
+`fief hub` sidecar, Pi/any Linux box via `fief tail up`. Dedicated
+userspace `tailscaled` everywhere — no root, no TUN, no system changes.
+
+1. Admin console → Settings → Keys: create a **reusable, tagged** auth key.
+   Cloud nodes (HF/Render, ephemeral disks, fresh identity each boot) MUST
+   use an **Ephemeral** key or dead entries pile up — ephemerality comes
+   from the key, there is no `--ephemeral` flag on `tailscale up`.
+   Pi (persistent disk) can use a stable key. Never commit keys
+   (`tskey-auth-…` is gitleaks-blocked).
+2. Hubs: set `TAILSCALE_AUTHKEY` (+ `TAIL_HOSTNAME=fief-hf|fief-render`,
+   `TAIL_SERVE=1080,1081`) as secret/env and restart. Sidecar joins and
+   serves the SOCKS ports on the node's tail IPs:
+   `curl -x socks5h://<hub-tail-ip>:1081 ifconfig.me`.
+   Optional: `TAIL_ADVERTISE_EXIT=1` offers the hub as exit node
+   (approve in admin console).
+3. Pi: `TAILSCALE_AUTHKEY=… TAIL_HOSTNAME=fief-pi uv run fief tail up`
+   (add `TAIL_PROXY=socks5h://127.0.0.1:1081` if its network is restricted,
+   `TAIL_ROUTES=192.168.x.0/24` to expose its LAN — routes need admin
+   approval, or tag auto-approvers). Persist with systemd/tmux.
+4. Verify: `fief tail status` / admin console shows the nodes; ping by
+   tail IP or MagicDNS name.
+
+Sleeping free-tier hubs drop off the tailnet until woken via public URL.
+Use tags (not IPs) in ACLs — ephemeral cloud nodes get new IPs each boot.
+
 ## Platform notes
 
 * **Render free** sleeps after ~15 min idle; first connect wakes it (~30s).

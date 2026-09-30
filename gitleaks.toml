@@ -18,3 +18,8 @@ regex = '''rnd_[A-Za-z0-9]{16,}'''
 description = "Hugging Face token"
 id = "hf-token"
 regex = '''hf_[A-Za-z0-9]{16,}'''
+
+[[rules]]
+description = "Tailscale auth key"
+id = "ts-authkey"
+regex = '''tskey-auth-[A-Za-z0-9_-]{20,}'''
