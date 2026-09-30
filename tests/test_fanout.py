@@ -65,12 +65,12 @@ class FakeHF:
 
 def test_fanout_hf_values_and_vars(fanout):
     api = FakeHF()
-    node = {"secrets": ["CHISEL_AUTH"], "vars": {"TAIL_HOSTNAME": "fief-hf"}}
+    node = {"secrets": ["CHISEL_AUTH"], "vars": {"FIEF_MESH_HOSTNAME": "fief-hf"}}
     assert fanout.fanout_hf(
         api, "o/n", node, {"CHISEL_AUTH": "u:S3CR3T"}, False, lambda m: None
     )
     assert api.secrets == {"CHISEL_AUTH": "u:S3CR3T"}
-    assert api.variables == {"TAIL_HOSTNAME": "fief-hf"}
+    assert api.variables == {"FIEF_MESH_HOSTNAME": "fief-hf"}
 
 
 def test_fanout_hf_missing_secret(fanout):
@@ -114,7 +114,7 @@ def _patch_urlopen(monkeypatch, fanout, calls):
 def test_fanout_render_puts(fanout, monkeypatch):
     calls: list = []
     _patch_urlopen(monkeypatch, fanout, calls)
-    node = {"secrets": ["CHISEL_AUTH"], "vars": {"TAIL_HOSTNAME": "fief-render"}}
+    node = {"secrets": ["CHISEL_AUTH"], "vars": {"FIEF_MESH_HOSTNAME": "fief-render"}}
     assert fanout.fanout_render(
         "k", "srv-1", node, {"CHISEL_AUTH": "u:S3CR3T"}, False, lambda m: None
     )
@@ -123,7 +123,7 @@ def test_fanout_render_puts(fanout, monkeypatch):
     assert methods == ["PUT", "PUT"]
     assert calls[0][1].endswith("/services/srv-1/env-vars/CHISEL_AUTH")
     assert json.loads(calls[0][2]) == {"value": "u:S3CR3T"}
-    assert calls[1][1].endswith("/services/srv-1/env-vars/TAIL_HOSTNAME")
+    assert calls[1][1].endswith("/services/srv-1/env-vars/FIEF_MESH_HOSTNAME")
 
 
 def test_fanout_render_missing_secret(fanout):
@@ -163,7 +163,7 @@ def _write_repo_files(tmp_path):
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "secrets.yaml").write_text(SOPS_BLOB)
     (tmp_path / "config" / "nodes.toml").write_text(
-        '[nodes.hf]\nvars = { TAIL_HOSTNAME = "fief-hf" }\nsecrets = ["CHISEL_AUTH"]\n'
+        '[nodes.hf]\nvars = { FIEF_MESH_HOSTNAME = "fief-hf" }\nsecrets = ["CHISEL_AUTH"]\n'
         '[nodes.render]\nvars = {}\nsecrets = ["CHISEL_AUTH"]\n'
     )
     secrets_json = tmp_path / "secrets.json"

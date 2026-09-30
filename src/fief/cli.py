@@ -1,4 +1,4 @@
-"""`fief` CLI: hub | exit | forward | tail | version."""
+"""`fief` CLI: hub | exit | forward | mesh | config | version."""
 
 from __future__ import annotations
 
@@ -30,12 +30,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="skip the 2222 sshd forward (hubs without SSH_PUBKEY)",
     )
 
-    tail = sub.add_parser("tail", help="tailnet node via fief")
-    tail_sub = tail.add_subparsers(dest="tail_cmd", required=True)
-    tail_sub.add_parser("up", help="join the tailnet (foreground supervisor)")
-    tail_sub.add_parser("down", help="leave + stop the node")
-    tail_status = tail_sub.add_parser("status", help="tailnet status")
-    tail_status.add_argument("--json", action="store_true")
+    mesh = sub.add_parser("mesh", help="mesh node via fief")
+    mesh_sub = mesh.add_subparsers(dest="mesh_cmd", required=True)
+    mesh_sub.add_parser("up", help="join the mesh (foreground supervisor)")
+    mesh_sub.add_parser("down", help="leave + stop the node")
+    mesh_status = mesh_sub.add_parser("status", help="mesh status")
+    mesh_status.add_argument("--json", action="store_true")
 
     cfg = sub.add_parser("config", help="one-place config (nodes.toml + secrets)")
     cfg_sub = cfg.add_subparsers(dest="config_cmd", required=True)
@@ -61,14 +61,14 @@ def main(argv: list[str] | None = None) -> int:
         from .client import cmd_forward
 
         return cmd_forward(no_ssh=args.no_ssh)
-    if args.cmd == "tail":
-        from . import tail as tail_mod
+    if args.cmd == "mesh":
+        from . import mesh as mesh_mod
 
-        if args.tail_cmd == "up":
-            return tail_mod.run_node(log=tail_mod.LOG.log)
-        if args.tail_cmd == "down":
-            return tail_mod.cmd_down()
-        return tail_mod.cmd_status(json_output=args.json)
+        if args.mesh_cmd == "up":
+            return mesh_mod.run_mesh(log=mesh_mod.LOG.log)
+        if args.mesh_cmd == "down":
+            return mesh_mod.cmd_down()
+        return mesh_mod.cmd_status(json_output=args.json)
     if args.cmd == "config":
         from . import config_cmd as config_mod
 

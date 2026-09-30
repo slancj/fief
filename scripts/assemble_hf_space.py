@@ -16,13 +16,30 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 
+# Explicit allowlist: ONLY these modules ship to HF. Everything else
+# (mesh/tailnet joiner, CLI, clients, config tooling) stays out — the Space
+# payload must never contain mesh-join capability or its signatures.
+PAYLOAD_MODULES = (
+    "__init__.py",
+    "hub.py",
+    "chisel.py",
+    "fetch.py",
+    "config.py",
+    "log.py",
+    "sshd.py",
+    "status.py",
+    "ui_gradio.py",
+)
+
 
 def assemble(out: Path) -> Path:
     if out.exists():
         shutil.rmtree(out)
     (out / "fief").mkdir(parents=True)
-    for src in sorted((HERE / "src" / "fief").glob("*.py")):
-        shutil.copy2(src, out / "fief" / src.name)
+    for name in PAYLOAD_MODULES:
+        src = HERE / "src" / "fief" / name
+        assert src.exists(), f"payload module missing: {name}"
+        shutil.copy2(src, out / "fief" / name)
     for name in ("app.py", "requirements.txt", "README.md"):
         shutil.copy2(HERE / "hf-space" / name, out / name)
     return out

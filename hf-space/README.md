@@ -34,8 +34,7 @@ setup:
 3. Push — first run creates the Space if missing (private, gradio SDK).
 4. Secrets arrive via fan-out (`config/secrets.yaml` → Space Secrets on
    every push touching `config/`; manual fallback is setting `CHISEL_AUTH`
-   (+ optional `SSH_PUBKEY`, `TAILSCALE_AUTHKEY`) in Space Settings).
-   Restart after any secret change.
+   (+ optional `SSH_PUBKEY`) in Space Settings). Restart after any change.
 5. Open the Space: status page = chisel is reachable through the same URL.
 
 Manual fallback: `python scripts/assemble_hf_space.py --out dist/space`,

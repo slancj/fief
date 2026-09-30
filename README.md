@@ -17,9 +17,9 @@ Raspberry Pi (`compose.yaml`), or any Docker host / Linux box.
 * **consumer** (`fief forward`) — one client connection opens local forwards:
   `1080` (LAN via exit node), `1081` (hub-egress internet), `2222`
   (shell on hubs with `SSH_PUBKEY` set).
-* **tail** (`fief tail up`) — join this box to your tailnet as a dedicated
-  userspace node (proxied or direct); hubs join too when `TAILSCALE_AUTHKEY`
-  is set, serving `1080`/`1081` on their tail IPs.
+* **mesh** (`fief mesh up`) — join this box to the mesh as a dedicated
+  userspace node (proxied or direct); hubs join too when `FIEF_MESH_KEY`
+  is set, serving `1080`/`1081` on their mesh IPs.
 
 ## Layout
 

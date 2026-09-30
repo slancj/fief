@@ -3,23 +3,26 @@
 # lists which secret KEYS it needs — values never appear here.
 # Fan-out (scripts/fanout.py) pushes secrets+vars to HF/Render;
 # hosts render dotenv via `fief config export --node <name> > .env`.
+#
+# The hf node deliberately has NO mesh key: the Space payload contains no
+# mesh-join code, so fan-out must never deliver mesh credentials there.
 
 [nodes.hf]
-# Hugging Face Space hub (test2). Secrets -> Space Secrets, vars -> Variables.
-vars = { TAIL_HOSTNAME = "fief-hf", TAIL_SERVE = "1080,1081" }
-secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "TAILSCALE_AUTHKEY"]
+# Hugging Face Space hub. Secrets -> Space Secrets, vars -> Variables.
+vars = { FIEF_MESH_HOSTNAME = "fief-hf", FIEF_MESH_SERVE = "1080,1081" }
+secrets = ["CHISEL_AUTH", "SSH_PUBKEY"]
 
 [nodes.render]
 # Render web service (fief-relay). Secrets+vars -> service env (PUT per key).
-vars = { TAIL_HOSTNAME = "fief-render", TAIL_SERVE = "1080,1081" }
-secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "TAILSCALE_AUTHKEY"]
+vars = { FIEF_MESH_HOSTNAME = "fief-render", FIEF_MESH_SERVE = "1080,1081" }
+secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.pi]
 # Raspberry Pi at friend's house. Render locally: fief config export --node pi.
-vars = { TAIL_HOSTNAME = "fief-pi", TAIL_SERVE = "", TAIL_ROUTES = "" }
-secrets = ["CHISEL_AUTH", "TAILSCALE_AUTHKEY"]
+vars = { FIEF_MESH_HOSTNAME = "fief-pi", FIEF_MESH_SERVE = "", FIEF_MESH_ROUTES = "" }
+secrets = ["CHISEL_AUTH", "FIEF_MESH_KEY"]
 
 [nodes.laptop]
 # Local dev/consumer box. Same export flow as pi.
-vars = { TAIL_HOSTNAME = "fief-laptop" }
+vars = { FIEF_MESH_HOSTNAME = "fief-laptop" }
 secrets = ["CHISEL_AUTH"]

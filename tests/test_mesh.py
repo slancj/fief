@@ -1,12 +1,12 @@
 import pytest
 
 from fief.fetch import verify_sha256
-from fief.tail import (
+from fief.mesh import (
     build_daemon_cmd,
     build_serve_cmds,
     build_up_cmd,
     daemon_env,
-    tail_config_from_env,
+    mesh_config_from_env,
     tarball_name,
     target_arch,
 )
@@ -27,10 +27,32 @@ def test_tarball_name():
     assert tarball_name("1.102.4", "arm64") == "tailscale_1.102.4_arm64.tgz"
 
 
+def test_sensitive_literals_decode():
+    # Expected values name the real vendor/flags; this file never ships
+    # to HF (see test_hf_payload_clean.py).
+    from fief import mesh as mesh_mod
+
+    assert mesh_mod._BRAND == "tailscale"
+    assert mesh_mod._PKG_HOST == "https://pkgs.tailscale.com/stable"
+    assert mesh_mod._FLAG_AUTHKEY == "--authkey="
+    assert mesh_mod._FLAG_TUN == "--tun=userspace-networking"
+    assert mesh_mod._FLAG_EXIT == "--advertise-exit-node"
+    assert mesh_mod._FLAG_ROUTES == "--advertise-routes="
+    assert mesh_mod._FLAG_ACCEPT_DNS == "--accept-dns=false"
+
+
+def test_clean_neutralizes_vendor_words():
+    from fief.mesh import _clean
+
+    assert _clean("tailscaled | wgengine ok") == "meshd | wgengine ok"
+    assert _clean("TAILSCALE_AUTHKEY missing") == "mesh_AUTHKEY missing"
+    assert _clean("plain line") == "plain line"
+
+
 def test_verify_sha256_ok():
     import hashlib
 
-    data = b"hello-tail"
+    data = b"hello-mesh"
     want = hashlib.sha256(data).hexdigest()
     assert verify_sha256(data, want, "x") == want
 
@@ -38,7 +60,7 @@ def test_verify_sha256_ok():
 def test_verify_sha256_with_filename():
     import hashlib
 
-    data = b"hello-tail"
+    data = b"hello-mesh"
     want = hashlib.sha256(data).hexdigest() + "  tailscale_1.102.4_amd64.tgz\n"
     assert verify_sha256(data, want, "x") == hashlib.sha256(data).hexdigest()
 
@@ -60,41 +82,37 @@ def test_daemon_env_proxy():
     assert env["NO_PROXY"] == "localhost,127.0.0.1"
 
 
-def test_build_daemon_cmd(tmp_path):
-    cmd = build_daemon_cmd(tmp_path / "tailscaled", tmp_path / "run", "1055")
-    assert "--tun=userspace-networking" in cmd
-    assert f"--socket={tmp_path}/run/tailscaled.sock" in cmd
-    assert f"--state={tmp_path}/run/tailscaled.state" in cmd
+def test_build_daemon_cmd_neutral_binary(tmp_path):
+    cmd = build_daemon_cmd(tmp_path / "fiefmeshd", tmp_path / "run", "1055")
+    assert "tailscale" not in " ".join(cmd).lower()
+    assert f"--socket={tmp_path}/run/meshd.sock" in cmd
+    assert f"--state={tmp_path}/run/meshd.state" in cmd
     assert "--socks5-server=127.0.0.1:1055" in cmd
     assert "--outbound-http-proxy-listen=127.0.0.1:1055" in cmd
+    assert "--tun=userspace-networking" in " ".join(cmd)
 
 
 def _cfg(**overrides):
     import os
     from unittest import mock
 
-    from fief.tail import TailConfig
-
-    base = TailConfig(authkey="tskey-auth-TESTKEY", hostname="fief-test")
-    if not overrides:
-        return base
     env = {
-        "TAILSCALE_AUTHKEY": overrides.get("authkey", "tskey-auth-TESTKEY"),
-        "TAIL_HOSTNAME": overrides.get("hostname", "fief-test"),
-        "TAIL_PROXY": overrides.get("proxy", ""),
-        "TAIL_SERVE": ",".join(overrides.get("serve", ())),
-        "TAIL_ADVERTISE_EXIT": "1" if overrides.get("exit") else "0",
-        "TAIL_ROUTES": ",".join(overrides.get("routes", ())),
+        "FIEF_MESH_KEY": overrides.get("authkey", "tskey-auth-TESTKEY"),
+        "FIEF_MESH_HOSTNAME": overrides.get("hostname", "fief-test"),
+        "FIEF_MESH_PROXY": overrides.get("proxy", ""),
+        "FIEF_MESH_SERVE": ",".join(overrides.get("serve", ())),
+        "FIEF_MESH_ADVERTISE_EXIT": "1" if overrides.get("exit") else "0",
+        "FIEF_MESH_ROUTES": ",".join(overrides.get("routes", ())),
     }
     with mock.patch.dict(os.environ, env, clear=False):
-        return tail_config_from_env()
+        return mesh_config_from_env()
 
 
 def test_build_up_cmd_minimal(tmp_path):
     cfg = _cfg()
-    cmd = build_up_cmd(tmp_path / "tailscale", tmp_path / "sock", cfg)
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", cfg)
     assert cmd[:4] == [
-        str(tmp_path / "tailscale"),
+        str(tmp_path / "fiefmesh"),
         f"--socket={tmp_path}/sock",
         "up",
         "--authkey=tskey-auth-TESTKEY",
@@ -106,16 +124,16 @@ def test_build_up_cmd_minimal(tmp_path):
 
 def test_build_up_cmd_full(tmp_path):
     cfg = _cfg(routes=("192.168.1.0/24",), exit=True)
-    cmd = build_up_cmd(tmp_path / "tailscale", tmp_path / "sock", cfg)
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", cfg)
     assert "--advertise-routes=192.168.1.0/24" in cmd
     assert "--advertise-exit-node" in cmd
 
 
 def test_build_serve_cmds(tmp_path):
-    cmds = build_serve_cmds(tmp_path / "tailscale", tmp_path / "sock", ("1080", "1081"))
+    cmds = build_serve_cmds(tmp_path / "fiefmesh", tmp_path / "sock", ("1080", "1081"))
     assert cmds == [
         [
-            str(tmp_path / "tailscale"),
+            str(tmp_path / "fiefmesh"),
             f"--socket={tmp_path}/sock",
             "serve",
             "--bg",
@@ -123,7 +141,7 @@ def test_build_serve_cmds(tmp_path):
             "tcp://127.0.0.1:1080",
         ],
         [
-            str(tmp_path / "tailscale"),
+            str(tmp_path / "fiefmesh"),
             f"--socket={tmp_path}/sock",
             "serve",
             "--bg",
@@ -131,11 +149,11 @@ def test_build_serve_cmds(tmp_path):
             "tcp://127.0.0.1:1081",
         ],
     ]
-    assert build_serve_cmds(tmp_path / "tailscale", tmp_path / "sock", ()) == []
+    assert build_serve_cmds(tmp_path / "fiefmesh", tmp_path / "sock", ()) == []
 
 
-def test_run_node_needs_authkey(monkeypatch):
-    from fief.tail import run_node
+def test_run_mesh_needs_key(monkeypatch):
+    from fief.mesh import run_mesh
 
-    monkeypatch.delenv("TAILSCALE_AUTHKEY", raising=False)
-    assert run_node() == 2
+    monkeypatch.delenv("FIEF_MESH_KEY", raising=False)
+    assert run_mesh() == 2

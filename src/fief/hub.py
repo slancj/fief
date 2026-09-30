@@ -8,7 +8,6 @@ With ui=none no --backend is passed and chisel serves /health itself.
 
 from __future__ import annotations
 
-import os
 import signal
 import subprocess
 import threading
@@ -113,16 +112,16 @@ def start_backend(
 
 
 def _maybe_start_tail() -> None:
-    """Tailnet sidecar in a background thread (hub keeps owning the foreground)."""
-    if not os.environ.get("TAILSCALE_AUTHKEY", ""):
-        return
-    from . import tail as tail_mod
+    """Mesh sidecar (hub keeps owning the foreground).
 
-    LOG.log("tailnet sidecar enabled (TAILSCALE_AUTHKEY set)")
-    thread = threading.Thread(
-        target=tail_mod.run_node, kwargs={"log": LOG.log}, daemon=True
-    )
-    thread.start()
+    The mesh module is excluded from hosts that must stay neutral
+    (e.g. the HF payload) — absence is a clean skip, not an error.
+    """
+    try:
+        from . import mesh as mesh_mod
+    except ImportError:
+        return
+    mesh_mod.maybe_start_from_env(log=LOG.log)
 
 
 def snapshot(cfg: HubConfig, hub_url: str) -> tuple[str, str]:

@@ -10,10 +10,10 @@ def test_subcommands():
     assert p.parse_args(["forward"]).cmd == "forward"
     assert p.parse_args(["forward", "--no-ssh"]).no_ssh is True
     assert p.parse_args(["version"]).cmd == "version"
-    assert p.parse_args(["tail", "up"]).tail_cmd == "up"
-    assert p.parse_args(["tail", "down"]).tail_cmd == "down"
-    assert p.parse_args(["tail", "status"]).tail_cmd == "status"
-    assert p.parse_args(["tail", "status", "--json"]).json is True
+    assert p.parse_args(["mesh", "up"]).mesh_cmd == "up"
+    assert p.parse_args(["mesh", "down"]).mesh_cmd == "down"
+    assert p.parse_args(["mesh", "status"]).mesh_cmd == "status"
+    assert p.parse_args(["mesh", "status", "--json"]).json is True
 
 
 def test_requires_subcommand():
