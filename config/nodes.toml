@@ -4,12 +4,15 @@
 # Fan-out (scripts/fanout.py) pushes secrets+vars to HF/Render;
 # hosts render dotenv via `fief config export --node <name> > .env`.
 #
-# The hf node deliberately has NO mesh key: the Space payload contains no
-# mesh-join code, so fan-out must never deliver mesh credentials there.
+# Per-node mesh toggles (FIEF_MESH_SSH etc.) are decided here, in each
+# node's `vars`. Fan-out pushes them as Space Variables / service env,
+# so this file is the SSH decision point — not the code. Defaults stay
+# off; the hf node opts in because it's an ephemeral uid-1000 container
+# (least-privilege place to accept a tailnet shell).
 
 [nodes.hf]
 # Hugging Face Space hub. Secrets -> Space Secrets, vars -> Variables.
-vars = { FIEF_MESH_HOSTNAME = "fief-hf", FIEF_MESH_SERVE = "1080,1081" }
+vars = { FIEF_MESH_HOSTNAME = "fief-hf", FIEF_MESH_SERVE = "1080,1081", FIEF_MESH_SSH = "1" }
 secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.render]

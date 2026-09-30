@@ -104,6 +104,7 @@ def _cfg(**overrides):
         "FIEF_MESH_SERVE": ",".join(overrides.get("serve", ())),
         "FIEF_MESH_ADVERTISE_EXIT": "1" if overrides.get("exit") else "0",
         "FIEF_MESH_ROUTES": ",".join(overrides.get("routes", ())),
+        "FIEF_MESH_SSH": "1" if overrides.get("ssh") else "0",
     }
     with mock.patch.dict(os.environ, env, clear=False):
         return mesh_config_from_env()
@@ -128,6 +129,16 @@ def test_build_up_cmd_full(tmp_path):
     cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", cfg)
     assert "--advertise-routes=192.168.1.0/24" in cmd
     assert "--advertise-exit-node" in cmd
+
+
+def test_build_up_cmd_ssh_opt_in(tmp_path):
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", _cfg(ssh=True))
+    assert "--ssh" in cmd
+
+
+def test_build_up_cmd_ssh_default_off(tmp_path):
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", _cfg())
+    assert "--ssh" not in cmd
 
 
 def test_build_serve_cmds(tmp_path):

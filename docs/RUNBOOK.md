@@ -76,11 +76,9 @@ after each hub update. `SSH_PUBKEY` unset = sshd stays off, chisel-only.
 
 ## Mesh (nodes join the mesh)
 
-Every fief node except the HF Space can be a mesh node: hubs
-(Render/Docker) via the `fief hub` sidecar, Pi/any Linux box via
-`fief mesh up`. Dedicated userspace daemon everywhere — no root, no TUN,
-no system changes. (HF is excluded by design: its payload contains no
-mesh code — see `scripts/assemble_hf_space.py` allowlist.)
+Every node can be a mesh node: hubs (HF Space, Render/Docker) via the
+`fief hub` sidecar, Pi/any Linux box via `fief mesh up`. Dedicated
+userspace daemon everywhere — no root, no TUN, no system changes.
 
 1. Admin console → Settings → Keys: create a **reusable, tagged** auth key.
    Cloud nodes (Render, ephemeral disks, fresh identity each boot) MUST
@@ -91,8 +89,14 @@ mesh code — see `scripts/assemble_hf_space.py` allowlist.)
    `FIEF_MESH_SERVE=1080,1081`) as env/secret and restart. Sidecar joins
    and serves the SOCKS ports on the node's mesh IPs:
    `curl -x socks5h://<hub-mesh-ip>:1081 ifconfig.me`.
-   Optional: `FIEF_MESH_ADVERTISE_EXIT=1` offers the hub as exit node
-   (approve in admin console).
+    Optional: `FIEF_MESH_ADVERTISE_EXIT=1` offers the hub as exit node
+    (approve in admin console).
+    Optional: `FIEF_MESH_SSH=1` enables tailnet SSH on the node
+    (`tailscale ssh <hostname>` from any peer). Decided per node in
+    `config/nodes.toml` vars — default off. Console side also needs the
+    Tailscale SSH feature toggle + an `ssh` grant in access controls,
+    otherwise connections are refused. The hf node opts in; it has no
+    sshd binary in its image, so tailnet SSH is the only shell there.
 3. Pi: `FIEF_MESH_KEY=… FIEF_MESH_HOSTNAME=fief-pi uv run fief mesh up`
    (add `FIEF_MESH_PROXY=socks5h://127.0.0.1:1081` if its network is
    restricted, `FIEF_MESH_ROUTES=192.168.x.0/24` to expose its LAN —
@@ -107,8 +111,9 @@ Use tags (not IPs) in ACLs — ephemeral cloud nodes get new IPs each boot.
 
 * **Render free** sleeps after ~15 min idle; first connect wakes it (~30s).
 * **HF Space**: keep private; free Spaces sleep when idle; client
-  `--keepalive 25s` usually keeps the websocket alive. sshd works here too
-  (uid 1000, serves the `user` account) once `SSH_PUBKEY` is set in Secrets.
+  `--keepalive 25s` usually keeps the websocket alive. No sshd binary in
+  the image, so the sidecar skips it — shell access is via tailnet SSH
+  (`FIEF_MESH_SSH=1`, see Mesh) as the container user.
 * **Pi/compose**: `restart: unless-stopped`; image from GHCR release tags
   (`v*` → amd64+arm64) or local `docker compose build`.
 * Local forwards are bare `local:remote` — no `L:` prefix (chisel parses

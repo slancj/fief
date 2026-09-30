@@ -147,6 +147,7 @@ class MeshConfig:
     advertise_exit: bool = False
     routes: tuple[str, ...] = ()
     accept_dns: bool = False
+    ssh: bool = False
     extra_args: tuple[str, ...] = ()
     version: str = DEFAULT_MESH_VERSION
     proxy_port: str = DEFAULT_PROXY_PORT
@@ -166,6 +167,7 @@ def mesh_config_from_env() -> MeshConfig:
         advertise_exit=os.environ.get("FIEF_MESH_ADVERTISE_EXIT", "0") == "1",
         routes=_split_list(os.environ.get("FIEF_MESH_ROUTES", "")),
         accept_dns=os.environ.get("FIEF_MESH_ACCEPT_DNS", "0") == "1",
+        ssh=os.environ.get("FIEF_MESH_SSH", "0") == "1",
         extra_args=tuple(shlex.split(os.environ.get("FIEF_MESH_EXTRA_ARGS", ""))),
         version=os.environ.get("FIEF_MESH_VERSION", DEFAULT_MESH_VERSION),
         proxy_port=os.environ.get("FIEF_MESH_PROXY_PORT", DEFAULT_PROXY_PORT),
@@ -210,6 +212,8 @@ def build_up_cmd(cli: Path, sock: Path, cfg: MeshConfig) -> list[str]:
         cmd.append(f"{_FLAG_ROUTES}{','.join(cfg.routes)}")
     if cfg.advertise_exit:
         cmd.append(_FLAG_EXIT)
+    if cfg.ssh:
+        cmd.append("--ssh")
     if not cfg.accept_dns:
         cmd.append(_FLAG_ACCEPT_DNS)
     cmd.extend(cfg.extra_args)
