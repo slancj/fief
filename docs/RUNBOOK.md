@@ -102,6 +102,12 @@ userspace daemon everywhere — no root, no TUN, no system changes.
     and SSH stays disabled). Ephemeral disks mean fresh host keys per
     boot; that pairs with the fresh node identity, so clients verify
     against the advertised keys without stale warnings.
+    Write `ssh` grants against a **tag**, not the hostname: reboots and
+    renames register as new machines (`fief-monitor-1` when a stale
+    `fief-monitor` entry still lingers), and a name-based `dst` silently
+    stops matching. Tag the auth key (e.g. `tag:fief`), grant
+    `dst: ["tag:fief"]`, and delete stale offline machine entries in the
+    console so the next boot reclaims the clean name.
 3. Pi: `FIEF_MESH_KEY=… FIEF_MESH_HOSTNAME=fief-pi uv run fief mesh up`
    (add `FIEF_MESH_PROXY=socks5h://127.0.0.1:1081` if its network is
    restricted, `FIEF_MESH_ROUTES=192.168.x.0/24` to expose its LAN —
