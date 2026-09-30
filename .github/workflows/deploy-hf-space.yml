@@ -47,18 +47,18 @@ jobs:
               raise SystemExit(
                   "Set the HF_SPACE_ID repo variable, e.g. '<owner>/<name>'"
               )
-           sha = os.environ.get("GITHUB_SHA", "local")[:12]
-           api = HfApi(token=os.environ["HF_TOKEN"])
-           try:
-               api.create_repo(
-                   space_id,
-                   repo_type="space",
-                   space_sdk="gradio",
-                   private=True,
-                   exist_ok=True,
-               )
-           except Exception as exc:  # e.g. 402: API refused creation
-               print(f"warning: create_repo failed ({exc}); continuing to sync")
+          sha = os.environ.get("GITHUB_SHA", "local")[:12]
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          try:
+              api.create_repo(
+                  space_id,
+                  repo_type="space",
+                  space_sdk="gradio",
+                  private=True,
+                  exist_ok=True,
+              )
+          except Exception as exc:  # e.g. 402: API refused creation
+              print(f"warning: create_repo failed ({exc}); continuing to sync")
           info = api.upload_folder(
               repo_id=space_id,
               repo_type="space",
