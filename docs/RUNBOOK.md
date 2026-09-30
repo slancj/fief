@@ -97,6 +97,11 @@ userspace daemon everywhere — no root, no TUN, no system changes.
     Tailscale SSH feature toggle + an `ssh` grant in access controls,
     otherwise connections are refused. The hf node opts in; it has no
     sshd binary in its image, so tailnet SSH is the only shell there.
+    Host keys live in the run dir (`ssh/` next to `meshd.state`, via
+    `--statedir` — without it the daemon logs "no var root for ssh keys"
+    and SSH stays disabled). Ephemeral disks mean fresh host keys per
+    boot; that pairs with the fresh node identity, so clients verify
+    against the advertised keys without stale warnings.
 3. Pi: `FIEF_MESH_KEY=… FIEF_MESH_HOSTNAME=fief-pi uv run fief mesh up`
    (add `FIEF_MESH_PROXY=socks5h://127.0.0.1:1081` if its network is
    restricted, `FIEF_MESH_ROUTES=192.168.x.0/24` to expose its LAN —

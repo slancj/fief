@@ -88,6 +88,8 @@ def test_build_daemon_cmd_neutral_binary(tmp_path):
     assert "tailscale" not in " ".join(cmd).lower()
     assert f"--socket={tmp_path}/run/meshd.sock" in cmd
     assert f"--state={tmp_path}/run/meshd.state" in cmd
+    # var root: without --statedir the daemon disables SSH host keys
+    assert f"--statedir={tmp_path}/run" in cmd
     assert "--socks5-server=127.0.0.1:1055" in cmd
     assert "--outbound-http-proxy-listen=127.0.0.1:1055" in cmd
     assert "--tun=userspace-networking" in " ".join(cmd)

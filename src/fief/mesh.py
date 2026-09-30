@@ -190,11 +190,17 @@ def daemon_env(proxy: str) -> dict[str, str]:
 
 
 def build_daemon_cmd(daemon: Path, run_dir: Path, proxy_port: str) -> list[str]:
+    # --statedir is mandatory, not redundant with --state: without it the
+    # daemon has no var root, so SSH host keys (and certs/taildrop) stay
+    # disabled ("no var root for ssh keys"). Auto-derivation only kicks in
+    # for one specifically-named parent dir, which ours isn't — so pass it
+    # explicitly.
     return [
         str(daemon),
         _FLAG_TUN,
         f"--socket={run_dir}/meshd.sock",
         f"--state={run_dir}/meshd.state",
+        f"--statedir={run_dir}",
         f"--socks5-server=127.0.0.1:{proxy_port}",
         f"--outbound-http-proxy-listen=127.0.0.1:{proxy_port}",
     ]
