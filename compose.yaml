@@ -1,0 +1,25 @@
+# Pi / any Docker host. Two roles, pick a profile:
+#   docker compose --profile hub up -d      # run the hub here
+#   docker compose --profile exit up -d     # run a LAN exit node here
+# Secrets live in .env (gitignored), never in this file.
+services:
+  hub:
+    build: .
+    image: fief-hub:local
+    profiles: ["hub"]
+    ports:
+      - "${PORT:-8080}:8080"
+    env_file:
+      - .env
+    environment:
+      PORT: "8080"
+    restart: unless-stopped
+
+  exit:
+    build: .
+    image: fief-hub:local
+    profiles: ["exit"]
+    env_file:
+      - .env
+    command: ["fief", "exit"]
+    restart: unless-stopped

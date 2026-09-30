@@ -1,17 +1,18 @@
 # fief-relay hub — deployed from this repo via Blueprint.
 # Apply: dashboard → New → Blueprint → slancj/fief (workspace needs
-# GitHub connected). Set CHISEL_AUTH at apply time; it is never committed.
+# GitHub connected). Secrets at apply time; they are never committed.
 services:
   - type: web
     name: fief-relay
     runtime: docker
     plan: free # sleeps after ~15 min idle; first connect wakes it (~30s cold start)
     region: oregon
-    dockerfilePath: ./image/Dockerfile
+    dockerfilePath: ./Dockerfile
     dockerContext: .
-    # No dockerCommand override: image/entrypoint.sh reads $PORT (injected
-    # by Render) and $CHISEL_AUTH and execs chisel server with
-    # --reverse (Windows R:socks) + --socks5 (Render-egress proxy).
+    # No dockerCommand override: `fief hub` (image CMD) reads $PORT (injected
+    # by Render) and $CHISEL_AUTH and runs server --reverse --socks5.
     envVars:
       - key: CHISEL_AUTH
         sync: false # dashboard secret, format user:secret
+      - key: SSH_PUBKEY
+        sync: false # optional: enables sshd sidecar (key-only, user fief)

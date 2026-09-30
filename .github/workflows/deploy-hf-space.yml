@@ -14,6 +14,8 @@ on:
     branches: [main]
     paths:
       - "hf-space/**"
+      - "src/**"
+      - "scripts/assemble_hf_space.py"
       - ".github/workflows/deploy-hf-space.yml"
   workflow_dispatch:
 
@@ -27,7 +29,9 @@ jobs:
           python-version: "3.12"
       - name: Install huggingface_hub
         run: pip install -q huggingface_hub
-      - name: Sync hf-space/ to the Space
+      - name: Assemble Space payload
+        run: python scripts/assemble_hf_space.py --out dist/space
+      - name: Sync payload to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
@@ -53,7 +57,7 @@ jobs:
           info = api.upload_folder(
               repo_id=space_id,
               repo_type="space",
-              folder_path="hf-space",
+              folder_path="dist/space",
               commit_message=f"sync from fief@{sha}",
           )
           print("deployed:", info.commit_url)

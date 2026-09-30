@@ -1,4 +1,4 @@
-# Secret scanning on every commit. Install once per clone:
+# Secret scanning + lint on every commit. Install once per clone:
 #   pre-commit install
 # (get pre-commit via: nix-shell -p pre-commit, pipx install pre-commit, ...)
 repos:
@@ -7,3 +7,10 @@ repos:
     hooks:
       - id: gitleaks
         args: ["--config", "gitleaks.toml"]
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.9
+    hooks:
+      - id: ruff
+        args: ["src", "tests", "scripts", "hf-space/app.py"]
+      - id: ruff-format
+        args: ["src", "tests", "scripts", "hf-space/app.py"]

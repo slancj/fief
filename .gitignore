@@ -1,7 +1,9 @@
 .env
 *.local
 /tmp/
-hf-space/bin/
+.venv/
+dist/
+__pycache__/
 
 # repomix packed-repo output (config itself stays committable)
 repomix-output.*
