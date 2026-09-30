@@ -5,6 +5,34 @@ from __future__ import annotations
 import inspect
 from collections.abc import Callable
 
+try:
+    import spaces
+except ImportError:
+    spaces = None  # only present on HF ZeroGPU images
+
+
+def _define_probe() -> Callable[[], None] | None:
+    """Invisible ZeroGPU watchdog probe. Never called → zero GPU quota."""
+    if spaces is None:
+        return None
+
+    @spaces.GPU
+    def _gpu_probe() -> None:
+        return None
+
+    return _gpu_probe
+
+
+_GPU_PROBE = _define_probe()
+
+
+def _register_probe(gr: object) -> None:
+    # ZeroGPU's startup scan walks Gradio's registered handlers; a bound
+    # @spaces.GPU handler keeps the Space alive on ZeroGPU hardware.
+    # The button is invisible and never clicked, so no GPU is ever used.
+    if _GPU_PROBE is not None:
+        gr.Button(visible=False).click(fn=_GPU_PROBE)  # type: ignore[attr-defined]
+
 
 def launch_demo(demo: object, *, server_name: str, server_port: int) -> None:
     """Launch a Blocks demo, dropping kwargs the installed Gradio lacks.
@@ -32,6 +60,7 @@ def build_ui(
 
     if not auth_ok:
         with gr.Blocks(title="fief-relay") as demo:
+            _register_probe(gr)
             gr.Markdown("# fief-relay hub (not configured)")
             gr.Markdown(
                 "Set the `CHISEL_AUTH` secret (format `user:secret`) "
@@ -41,6 +70,7 @@ def build_ui(
         return demo
 
     with gr.Blocks(title="fief-relay") as demo:
+        _register_probe(gr)
         gr.Markdown("# fief-relay hub")
         gr.Markdown(
             f"Chisel hub on `{hub_url}`. Browser traffic here is proxied "

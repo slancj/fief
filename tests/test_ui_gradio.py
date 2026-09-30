@@ -1,5 +1,9 @@
 """launch_demo must tolerate Gradio 5.x and 6.x launch() signatures."""
 
+import importlib
+import sys
+import types
+
 
 class FakeDemo5:
     def __init__(self):
@@ -51,3 +55,45 @@ def test_launch_demo_gradio6():
         "server_port": 7861,
         "prevent_thread_lock": True,
     }
+
+
+def test_gpu_probe_defined_when_spaces_present(monkeypatch):
+    import fief.ui_gradio as gradio_ui
+
+    stub = types.ModuleType("spaces")
+    stub.GPU = lambda fn: fn  # bare @spaces.GPU usage
+    monkeypatch.setitem(sys.modules, "spaces", stub)
+    importlib.reload(gradio_ui)
+    try:
+        assert callable(gradio_ui._GPU_PROBE)
+    finally:
+        monkeypatch.undo()
+        importlib.reload(gradio_ui)
+    assert gradio_ui._GPU_PROBE is None
+
+
+def test_register_probe_binds_invisible_button(monkeypatch):
+    from fief import ui_gradio
+
+    clicks = []
+
+    class FakeButton:
+        def __init__(self, visible=True):
+            self.visible = visible
+
+        def click(self, fn):
+            clicks.append((self.visible, fn))
+
+    class FakeGr:
+        Button = FakeButton
+
+    def sentinel() -> None:
+        return None
+
+    monkeypatch.setattr(ui_gradio, "_GPU_PROBE", sentinel)
+    ui_gradio._register_probe(FakeGr)
+    assert clicks == [(False, sentinel)]
+
+    monkeypatch.setattr(ui_gradio, "_GPU_PROBE", None)
+    ui_gradio._register_probe(FakeGr)
+    assert len(clicks) == 1  # no new handler without the probe
