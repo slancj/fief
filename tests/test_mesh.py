@@ -28,8 +28,9 @@ def test_tarball_name():
 
 
 def test_sensitive_literals_decode():
-    # Expected values name the real vendor/flags; this file never ships
-    # to HF (see test_hf_payload_clean.py).
+    # Expected values name the real vendor/flags; the shipped copy keeps
+    # them base64-encoded and only decodes at runtime
+    # (see test_hf_payload_clean.py).
     from fief import mesh as mesh_mod
 
     assert mesh_mod._BRAND == "tailscale"

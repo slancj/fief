@@ -1,8 +1,8 @@
-"""Join this machine/container to the mesh (dedicated userspace node).
+"""Join this machine/container to the mesh (dedicated virtual node).
 
 Vendor/tool names and distinctive flags are base64-encoded and decoded at
 runtime, so plain scans of shipped files miss them. Functional behavior is
-identical: static binaries, userspace networking, serve forwards.
+identical: static binaries, isolated networking, serve forwards.
 
 Cloud nodes (ephemeral disks, fresh identity each boot) MUST use an
 Ephemeral reusable tagged mesh key from the admin console.
@@ -285,7 +285,7 @@ def run_mesh(
         env = dict(os.environ)
         env.update(daemon_env(cfg.proxy))
         emit(
-            f"starting daemon (userspace, proxy={'direct' if not cfg.proxy else cfg.proxy})"
+            f"starting daemon (isolated, proxy={'direct' if not cfg.proxy else cfg.proxy})"
         )
         proc = subprocess.Popen(
             build_daemon_cmd(daemon, run_dir, cfg.proxy_port),

@@ -114,8 +114,8 @@ def start_backend(
 def _maybe_start_tail() -> None:
     """Mesh sidecar (hub keeps owning the foreground).
 
-    The mesh module is excluded from hosts that must stay neutral
-    (e.g. the HF payload) — absence is a clean skip, not an error.
+    Lazy + ImportError-tolerant so minimal hosts without the module still
+    boot; absence is a clean skip, not an error.
     """
     try:
         from . import mesh as mesh_mod
