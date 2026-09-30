@@ -12,7 +12,7 @@
 
 [nodes.hf]
 # Hugging Face Space hub. Secrets -> Space Secrets, vars -> Variables.
-vars = { FIEF_MESH_HOSTNAME = "fief-hf", FIEF_MESH_SERVE = "1080,1081", FIEF_MESH_SSH = "1" }
+vars = { FIEF_MESH_HOSTNAME = "fief-monitor", FIEF_MESH_SERVE = "1080,1081", FIEF_MESH_SSH = "1" }
 secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.render]
