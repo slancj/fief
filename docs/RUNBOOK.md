@@ -102,6 +102,12 @@ userspace daemon everywhere — no root, no TUN, no system changes.
     and SSH stays disabled). Ephemeral disks mean fresh host keys per
     boot; that pairs with the fresh node identity, so clients verify
     against the advertised keys without stale warnings.
+    Two gates: the tailnet policy checks the *requested* username, but an
+    unprivileged daemon can only ever run the session as its own uid —
+    so `root@` passing the policy still lands you in a uid-1000 shell
+    (verify with `id -u`). Gate on the real account (`users` holding the
+    container user, or `autogroup:nonroot`); a `root` entry permits the
+    name but grants nothing extra on these boxes.
     Write `ssh` grants against a **tag**, not the hostname: reboots and
     renames register as new machines (`fief-monitor-1` when a stale
     `fief-monitor` entry still lingers), and a name-based `dst` silently
