@@ -142,7 +142,7 @@ def main(cfg: HubConfig | None = None) -> int:
             LOG.log(str(exc))
             return 1
 
-    maybe_start_sshd(cfg.ssh_pubkey, cfg.ssh_port, log=LOG.log)
+    maybe_start_sshd(cfg.ssh_pubkey, cfg.ssh_port, cfg.ssh_user, log=LOG.log)
     binary = ensure_chisel(cfg.version, log=LOG.log)
 
     backoff = 5

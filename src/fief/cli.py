@@ -27,7 +27,7 @@ def build_parser() -> argparse.ArgumentParser:
     fwd.add_argument(
         "--no-ssh",
         action="store_true",
-        help="skip the 2222 sshd forward (hubs without sshd)",
+        help="skip the 2222 sshd forward (hubs without SSH_PUBKEY)",
     )
 
     sub.add_parser("version", help="print version")

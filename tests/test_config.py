@@ -39,11 +39,13 @@ def test_from_env():
         FIEF_UI="none",
         SSH_PUBKEY="ssh-ed25519 AAA",
         SSH_PORT="2223",
+        SSH_USER="ops",
     )
     with mock.patch.dict(os.environ, env, clear=True):
         cfg = hub_config_from_env()
         assert (cfg.auth, cfg.port, cfg.ui) == ("u:s", "9999", "none")
         assert (cfg.ssh_pubkey, cfg.ssh_port) == ("ssh-ed25519 AAA", "2223")
+        assert cfg.ssh_user == "ops"
 
 
 def test_resolve_ui_explicit():

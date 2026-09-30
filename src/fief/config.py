@@ -22,6 +22,7 @@ class HubConfig:
     ui: str = "auto"  # auto | gradio | basic | none
     ssh_pubkey: str = ""
     ssh_port: str = "2222"
+    ssh_user: str = "fief"  # login user when root; non-root serves its own user
 
 
 def hub_config_from_env() -> HubConfig:
@@ -34,6 +35,7 @@ def hub_config_from_env() -> HubConfig:
         ui=os.environ.get("FIEF_UI", "auto"),
         ssh_pubkey=os.environ.get("SSH_PUBKEY", ""),
         ssh_port=os.environ.get("SSH_PORT", "2222"),
+        ssh_user=os.environ.get("SSH_USER", "fief"),
     )
 
 

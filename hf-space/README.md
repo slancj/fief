@@ -14,9 +14,8 @@ pinned: false
 Outbound-only chisel hub. A Linux exit node opens a reverse SOCKS, consumers
 forward it home (`1080`) and take a second SOCKS off HF egress (`1081`).
 Chisel owns port `7860`; browser traffic (healthcheck, status page) is proxied
-by chisel `--backend` to the Gradio app on `127.0.0.1:7861`. No sshd here
-(Spaces runs as uid 1000) — use a Docker-capable hub for the shell-on-hub
-feature.
+by chisel `--backend` to the Gradio app on `127.0.0.1:7861`. sshd works here
+too (uid 1000, serves the `user` account) once `SSH_PUBKEY` is set.
 
 > This folder is assembled by CI (`scripts/assemble_hf_space.py`): `app.py`
 > is a thin shim, the `fief/` package is vendored from `src/fief` at deploy
@@ -33,7 +32,9 @@ setup:
 2. GitHub repo → Settings → Secrets and variables → Actions:
    `HF_TOKEN` (secret) + `HF_SPACE_ID='<owner>/<name>'` (variable).
 3. Push — first run creates the Space if missing (private, gradio SDK).
-4. Space Settings → Secrets: set `CHISEL_AUTH` (`user:secret`), then Restart.
+4. Space Settings → Secrets: set `CHISEL_AUTH` (`user:secret`), plus
+   optional `SSH_PUBKEY` for a shell on the hub (login as `user`, not
+   `fief`), then Restart.
 5. Open the Space: status page = chisel is reachable through the same URL.
 
 Manual fallback: `python scripts/assemble_hf_space.py --out dist/space`,
@@ -43,7 +44,8 @@ then `git push` that folder to
 ## Clients
 
 Hub URL is `https://<owner>-<space>.hf.space`. Same auth as the secret.
-No `2222` sshd forward on this hub — pass `--no-ssh`:
+With `SSH_PUBKEY` set, `fief forward` also maps the hub shell to
+localhost:2222 (`ssh -p 2222 user@127.0.0.1`); without it pass `--no-ssh`:
 
 ```sh
 # Exit node (a Linux box on the LAN):
@@ -51,7 +53,7 @@ HUB_URL='https://<owner>-<space>.hf.space' CHISEL_AUTH='user:secret' fief exit
 
 # Consumer (1080 = LAN exit, 1081 = HF egress exit):
 HUB_URL='https://<owner>-<space>.hf.space' CHISEL_AUTH='user:secret' \
-  fief forward --no-ssh
+  fief forward
 ```
 
 ## Notes

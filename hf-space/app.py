@@ -14,5 +14,5 @@ from fief.config import hub_config_from_env
 from fief.hub import main
 
 if __name__ == "__main__":
-    cfg = replace(hub_config_from_env(), ui="gradio", ssh_pubkey="")
+    cfg = replace(hub_config_from_env(), ui="gradio")
     raise SystemExit(main(cfg))
