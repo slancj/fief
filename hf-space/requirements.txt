@@ -1,0 +1,3 @@
+# HF Spaces (Gradio SDK) runtime deps. The chisel binary is fetched at
+# startup by app.py (pinned + sha256-verified), so no binary is committed.
+gradio>=5.0,<6.0

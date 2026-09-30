@@ -38,6 +38,16 @@ ssh -p 2222 fief@127.0.0.1
 Host keys regenerate on every deploy, so expect a changed-host-key prompt
 after each hub update. `SSH_PUBKEY` unset = sshd stays off, chisel-only.
 
+## Hugging Face Spaces backup hub (Gradio)
+
+Push `hf-space/` as a private Gradio Space (root = `app.py`). Set
+`CHISEL_AUTH` in Space Secrets and restart. Chisel owns `7860` and proxies
+browser traffic via `--backend` to Gradio on `127.0.0.1:7861`.
+
+Clients point at `HUB_URL='https://<owner>-<space>.hf.space'` (`HUB_URL`-aware
+`windows/run-chisel.ps1`, `HUB_URL=... linux/chisel-forward.sh`). Drop the
+`2222` sshd forward on this hub — Spaces mode is chisel-only, no sshd.
+
 ## Notes
 
 * Local forwards are bare `local:remote` — no `L:` prefix (it parses

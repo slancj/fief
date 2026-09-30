@@ -1,6 +1,7 @@
 .env
 *.local
 /tmp/
+hf-space/bin/
 
 # repomix packed-repo output (config itself stays committable)
 repomix-output.*

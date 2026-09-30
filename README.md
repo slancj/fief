@@ -18,6 +18,8 @@ from a free cloud relay — no inbound ports, no kernel drivers.
 * `linux/chisel-forward.sh` — Linux forwards (`1080` LAN, `1081` egress)
 * `docs/RUNBOOK.md` — start order, healthy logs, gotchas
 * `image/` — hub image (Alpine + pinned chisel, env-driven entrypoint)
+* `hf-space/` — backup hub as a Gradio Space (`app.py`, chisel on 7860 with
+  `--backend` to Gradio; private Space, `CHISEL_AUTH` via Secrets)
 
 ## Quickstart
 

@@ -1,0 +1,60 @@
+# Auto-deploy hf-space/ to Hugging Face on push to main.
+#
+# One-time setup (nothing secret is committed here):
+#   1. HF Settings -> Access Tokens: fine-grained token with Write on your
+#      (private) Space, e.g. "<owner>/<name>". A full-access token also
+#      works but can delete repos — prefer fine-grained.
+#   2. GitHub repo -> Settings -> Secrets and variables -> Actions:
+#        secret   HF_TOKEN    = the token from step 1
+#        variable HF_SPACE_ID = "<owner>/<name>"
+# First run creates the Space if missing (private, gradio SDK).
+name: deploy-hf-space
+on:
+  push:
+    branches: [main]
+    paths:
+      - "hf-space/**"
+      - ".github/workflows/deploy-hf-space.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install huggingface_hub
+        run: pip install -q huggingface_hub
+      - name: Sync hf-space/ to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+        run: |
+          python - <<'EOF'
+          import os
+          from huggingface_hub import HfApi
+
+          space_id = os.environ.get("HF_SPACE_ID", "")
+          if "/" not in space_id:
+              raise SystemExit(
+                  "Set the HF_SPACE_ID repo variable, e.g. '<owner>/<name>'"
+              )
+          sha = os.environ.get("GITHUB_SHA", "local")[:12]
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          api.create_repo(
+              space_id,
+              repo_type="space",
+              space_sdk="gradio",
+              private=True,
+              exist_ok=True,
+          )
+          info = api.upload_folder(
+              repo_id=space_id,
+              repo_type="space",
+              folder_path="hf-space",
+              commit_message=f"sync from fief@{sha}",
+          )
+          print("deployed:", info.commit_url)
+          EOF

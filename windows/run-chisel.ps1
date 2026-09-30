@@ -7,7 +7,7 @@
 # Auth via env var so the secret never lands in a file:
 #   $env:CHISEL_AUTH = 'spider:...'; .\run-chisel.ps1
 $ErrorActionPreference = "Stop"
-$HUB = "https://spider-chisel.onrender.com"
+$HUB = if ($env:HUB_URL) { $env:HUB_URL } else { "https://spider-chisel.onrender.com" }
 $AUTH = if ($env:CHISEL_AUTH) { $env:CHISEL_AUTH } else { "spider:CHANGE_ME" }
 $exe = Join-Path $PSScriptRoot "chisel.exe"
 if (-not (Test-Path $exe)) {
