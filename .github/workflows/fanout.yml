@@ -22,6 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
       - name: Install sops
         env:
           SOPS_VERSION: v3.10.2
@@ -43,6 +46,9 @@ jobs:
           fi
           /tmp/sops --decrypt --output-type json config/secrets.yaml > "$RUNNER_TEMP/secrets.json"
           echo "ready=true" >> "$GITHUB_OUTPUT"
+      - name: Install huggingface_hub
+        if: steps.decrypt.outputs.ready == 'true'
+        run: pip install -q huggingface_hub
       - name: Fan out
         if: steps.decrypt.outputs.ready == 'true'
         env:
