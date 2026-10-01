@@ -9,6 +9,7 @@ on:
     paths:
       - "config/**"
       - "scripts/fanout.py"
+      - ".github/actions/python-env/**"
       - ".github/workflows/fanout.yml"
   workflow_dispatch:
     inputs:
@@ -21,10 +22,7 @@ jobs:
   fanout:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
+      - uses: ./.github/actions/python-env
       - name: Install sops
         env:
           SOPS_VERSION: v3.10.2
@@ -46,9 +44,6 @@ jobs:
           fi
           /tmp/sops --decrypt --output-type json config/secrets.yaml > "$RUNNER_TEMP/secrets.json"
           echo "ready=true" >> "$GITHUB_OUTPUT"
-      - name: Install huggingface_hub
-        if: steps.decrypt.outputs.ready == 'true'
-        run: pip install -q huggingface_hub
       - name: Fan out
         if: steps.decrypt.outputs.ready == 'true'
         env:
@@ -57,4 +52,4 @@ jobs:
           HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ vars.RENDER_SERVICE_ID }}
-        run: python scripts/fanout.py ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}
+        run: uv run --no-project --with huggingface_hub scripts/fanout.py ${{ github.event.inputs.dry_run == 'true' && '--dry-run' || '' }}

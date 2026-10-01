@@ -19,6 +19,7 @@ on:
       - "src/**"
       - "scripts/assemble_hf_space.py"
       - "scripts/sync_hf_space.py"
+      - ".github/actions/python-env/**"
       - ".github/workflows/deploy-hf-space.yml"
   workflow_dispatch:
 
@@ -26,16 +27,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-      - name: Install huggingface_hub
-        run: pip install -q huggingface_hub
+      - uses: ./.github/actions/python-env
       - name: Assemble Space payload
-        run: python scripts/assemble_hf_space.py --out dist/space
+        run: uv run --no-project scripts/assemble_hf_space.py --out dist/space
       - name: Sync payload to the Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
-        run: python scripts/sync_hf_space.py
+        run: uv run --no-project --with huggingface_hub scripts/sync_hf_space.py

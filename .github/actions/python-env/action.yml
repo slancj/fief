@@ -1,0 +1,11 @@
+# Shared Python env: checkout + Python 3.12 via uv (no project sync —
+# callers add `uv sync` or `uv run --with ...` for their own deps).
+name: python-env
+description: Checkout the repo and provide Python 3.12 through uv.
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v5
+    - uses: astral-sh/setup-uv@v6
+      with:
+        python-version: "3.12"
