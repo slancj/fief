@@ -134,6 +134,10 @@ userspace daemon everywhere — no root, no TUN, no system changes.
    systemd/tmux.
 4. Verify: `fief mesh status` / admin console shows the nodes.
    Leave with `fief mesh down`. (`fief version` prints the build.)
+   Daemon logs are quiet by default: known-routine chatter is suppressed
+   (counted, with a receipt every 100 lines) while errors and unknown
+   lines always show. `FIEF_MESH_VERBOSE=1` restores full passthrough
+   for debugging sessions.
 
 Sleeping free-tier hubs drop off the mesh until woken via public URL.
 Use tags (not IPs) in ACLs — ephemeral cloud nodes get new IPs each boot.

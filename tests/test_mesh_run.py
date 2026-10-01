@@ -1,11 +1,70 @@
 from fief.config import mesh_config_from_env
 from fief.mesh_run import (
+    MeshLogFilter,
     build_daemon_cmd,
     build_serve_cmds,
     build_up_cmd,
     check_serve_target,
     daemon_env,
 )
+
+ROUTINE_SAMPLES = [
+    "magicsock: new contact: peer=[Hferv] usec=30216435 cached=false via=derp",
+    "magicsock: endpoints changed: 3.22.120.161:60934 (stun)",
+    "magicsock: home is now derp-12 (ord)",
+    "magicsock: 1 active derp conns: derp-12=cr0s,wr0s",
+    "derphttp.Client.Connect: connecting to derp-12 (ord)",
+    "update netmap cache: profile local data storage unavailable",
+    "dns: Set: {DefaultResolvers:[] Routes:{} SearchDomains:[] Hosts:0}",
+    "tsdial: bart table size: 6",
+    "peerapi: serving on http://100.101.27.27:53935",
+    "wgengine: Reconfig: configuring router",
+    "control: NetInfo: NetInfo{varies=true udp=true}",
+    "taildrop: Taildrop disabled; no state directory",
+    "offline auto-update: stopping update checks",
+    "cannot fetch existing TKA state; no state directory for lock",
+]
+
+PASS_SAMPLES = [
+    "Switching ipn state Starting -> Running (WantRunning=true, nm=true)",
+    "warning: unable to get SSH host keys, SSH will appear as disabled",
+    "active login: someone@example.com",
+    "EditPrefs: MaskedPrefs{AutoUpdate={Apply=true}}",
+    "join failed: invalid authkey",
+    "health(warnable=warming-up): ok",
+]
+
+
+def test_filter_suppresses_routine():
+    f = MeshLogFilter()
+    for line in ROUTINE_SAMPLES:
+        assert f.check(line) is None, line
+    assert f.suppressed == len(ROUTINE_SAMPLES)
+
+
+def test_filter_passes_errors_and_unknown():
+    f = MeshLogFilter()
+    for line in PASS_SAMPLES:
+        assert f.check(line) == line, line
+    assert f.suppressed == 0
+
+
+def test_filter_receipt_every_hundred():
+    f = MeshLogFilter(receipt_every=10)
+    out = [f.check(ROUTINE_SAMPLES[0]) for _ in range(25)]
+    assert out[9] == "meshd: 10 routine lines suppressed (FIEF_MESH_VERBOSE=1 for full)"
+    assert (
+        out[19] == "meshd: 20 routine lines suppressed (FIEF_MESH_VERBOSE=1 for full)"
+    )
+    assert out[24] is None
+    assert f.suppressed == 25
+
+
+def test_filter_verbose_passes_all():
+    f = MeshLogFilter(verbose=True)
+    for line in ROUTINE_SAMPLES:
+        assert f.check(line) == line, line
+    assert f.suppressed == 0
 
 
 def test_daemon_env_direct():

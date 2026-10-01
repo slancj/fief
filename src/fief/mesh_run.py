@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import signal
 import subprocess
 import threading
@@ -34,6 +35,59 @@ from .store import cache_dir
 
 LOG = LogBuffer()
 STOP = threading.Event()
+
+
+#: Daemon lines positively identified as routine chatter (observed volume:
+#: hundreds/hour — endpoint churn, keepalives, cache/config notices).
+#: Everything NOT listed here passes through, so unknown future lines
+#: (including novel failure modes) stay visible by default.
+_ROUTINE_PATTERNS = (
+    r"^magicsock:",
+    r"^derphttp\.",
+    r"^(dns|tsdial|peerapi|wgengine|control):",
+    r"^netmap:",
+    r"^update netmap cache:",
+    r"^taildrop:",
+    r"^offline auto-update:",
+    r"cannot fetch existing TKA state",
+)
+_ROUTINE_RES = tuple(re.compile(p, re.IGNORECASE) for p in _ROUTINE_PATTERNS)
+
+#: Any line carrying these always passes — errors must never be silenced
+#: by a routine pattern above.
+_ERROR_RE = re.compile(
+    r"error|fail|warn|denied|refus|unable|invalid|expired|panic|fatal"
+    r"|reject|timeout|reset|broken|down|unhealthy|degraded|blocked",
+    re.IGNORECASE,
+)
+
+
+class MeshLogFilter:
+    """Daemon-log policy: silence known-routine, always show errors+unknown.
+
+    Suppressed lines are counted; every ``receipt_every``-th one emits a
+    summary so healthy silence is distinguishable from a dead daemon.
+    ``verbose`` restores full passthrough (FIEF_MESH_VERBOSE=1).
+    """
+
+    def __init__(self, verbose: bool = False, receipt_every: int = 100) -> None:
+        self.verbose = verbose
+        self.receipt_every = receipt_every
+        self.suppressed = 0
+
+    def check(self, line: str) -> str | None:
+        """Return the line to emit, a receipt line, or None to drop."""
+        if self.verbose or _ERROR_RE.search(line) is not None:
+            return line
+        if any(rx.search(line) for rx in _ROUTINE_RES):
+            self.suppressed += 1
+            if self.suppressed % self.receipt_every == 0:
+                return (
+                    f"meshd: {self.suppressed} routine lines suppressed "
+                    "(FIEF_MESH_VERBOSE=1 for full)"
+                )
+            return None
+        return line
 
 
 def register(sub: argparse._SubParsersAction) -> None:
@@ -213,9 +267,19 @@ def run_mesh(
             )
             proc = spawn(build_daemon_cmd(daemon, run_dir, cfg.proxy_port), env=env)
             (run_dir / "meshd.pid").write_text(str(proc.pid) + "\n")
+            log_filter = MeshLogFilter(
+                verbose=os.environ.get("FIEF_MESH_VERBOSE", "") == "1"
+            )
 
-            def _drain(p: subprocess.Popen = proc) -> None:
-                drain(p, lambda line: emit("meshd | " + _clean(line)), stop)
+            def _drain(
+                p: subprocess.Popen = proc, f: MeshLogFilter = log_filter
+            ) -> None:
+                def _emit(line: str) -> None:
+                    out = f.check(_clean(line))
+                    if out is not None:
+                        emit("meshd | " + out)
+
+                drain(p, _emit, stop)
 
             drain_thread = threading.Thread(target=_drain, daemon=True)
             drain_thread.start()

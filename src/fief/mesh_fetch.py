@@ -36,6 +36,11 @@ _FLAG_EXIT = _d("LS1hZHZlcnRpc2UtZXhpdC1ub2Rl")
 _FLAG_ROUTES = _d("LS1hZHZlcnRpc2Utcm91dGVzPQ==")
 _FLAG_ACCEPT_DNS = _d("LS1hY2NlcHQtZG5zPWZhbHNl")
 _CLEAN_RE = re.compile(_BRAND, re.IGNORECASE)
+# Key material and the control endpoint never belong in logs. Literals stay
+# encoded like everything else here (see module docstring).
+_KEYMAT_RE = re.compile(_d("dHNrZXkt") + r"[A-Za-z0-9-_]+")
+_CONTROLPLANE_RE = re.compile(_d("Y29udHJvbHBsYW5l"), re.IGNORECASE)
+_NETNAME_RE = re.compile(_d("dGFpbG5ldA=="), re.IGNORECASE)
 
 MACHINE_TO_ARCH = {
     "x86_64": "amd64",
@@ -49,7 +54,10 @@ MACHINE_TO_ARCH = {
 
 def _clean(text: str) -> str:
     """Neutralize vendor words in external (binary/daemon) output before logging."""
-    return _CLEAN_RE.sub("mesh", text)
+    text = _CLEAN_RE.sub("mesh", text)
+    text = _NETNAME_RE.sub("mesh", text)
+    text = _CONTROLPLANE_RE.sub("control", text)
+    return _KEYMAT_RE.sub("meshkey-REDACTED", text)
 
 
 def target_arch(machine: str | None = None) -> str:

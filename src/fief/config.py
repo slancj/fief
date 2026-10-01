@@ -101,6 +101,7 @@ KNOWN_VARS = frozenset(
         "FIEF_MESH_EXTRA_ARGS",
         "FIEF_MESH_VERSION",
         "FIEF_MESH_PROXY_PORT",
+        "FIEF_MESH_VERBOSE",
         "HUB_URL",
         "LOCAL_PORT",
         "EGRESS_PORT",

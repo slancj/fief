@@ -40,6 +40,12 @@ def test_clean_neutralizes_vendor_words():
 
     assert _clean("tailscaled | wgengine ok") == "meshd | wgengine ok"
     assert _clean("TAILSCALE_AUTHKEY missing") == "mesh_AUTHKEY missing"
+    assert _clean("using tailnet default setting") == "using mesh default setting"
+    assert _clean("dial controlplane.tailscale.com:443") == "dial control.mesh.com:443"
+    assert (
+        _clean("bad key tskey-auth-ABC123xyz starting")
+        == "bad key meshkey-REDACTED starting"
+    )
     assert _clean("plain line") == "plain line"
 
 
