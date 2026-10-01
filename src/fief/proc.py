@@ -11,6 +11,7 @@ children are never orphaned (e.g. KeyboardInterrupt in the main thread).
 from __future__ import annotations
 
 import os
+import select
 import signal
 import subprocess
 import threading
@@ -51,16 +52,48 @@ def drain(
 ) -> None:
     """Stream ``proc`` stdout lines to ``emit`` until EOF or ``stop``.
 
-    A still-running child is terminated when ``stop`` fires, and also on
-    any exception (so Ctrl-C can't orphan it). Termination is skipped
-    when the child already exited.
+    Readiness-waited (not blocking ``readline``), so ``stop`` takes effect
+    within ~0.2s even for silent children. A still-running child is
+    terminated when ``stop`` fires, and also on any exception (so Ctrl-C
+    can't orphan it). Termination is skipped when the child already exited.
     """
     assert proc.stdout is not None
+    # NOTE: raw os.read on the fd bypasses the BufferedReader — safe only
+    # because drain is the sole reader of proc.stdout. Never readline() it
+    # elsewhere or buffered bytes would be silently skipped.
+    fd = proc.stdout.fileno()
+    buf = bytearray()
     try:
-        for line in proc.stdout:
-            emit(line.rstrip("\n"))
+        while True:
             if stop.is_set():
                 break
+            if proc.poll() is not None:
+                # Exited: non-blocking flush of whatever is left in the pipe.
+                try:
+                    while True:
+                        chunk = os.read(fd, 65536)
+                        if not chunk:
+                            break
+                        buf += chunk
+                except OSError:
+                    pass
+                break
+            ready, _, _ = select.select([fd], [], [], 0.2)
+            if not ready:
+                continue
+            try:
+                chunk = os.read(fd, 65536)
+            except OSError:
+                break
+            if not chunk:
+                break  # EOF
+            buf += chunk
+            while b"\n" in buf:
+                line, _, rest = buf.partition(b"\n")
+                buf = bytearray(rest)
+                emit(bytes(line).decode(errors="replace"))
+        if buf:
+            emit(bytes(buf).decode(errors="replace"))
     except BaseException:
         if proc.poll() is None:
             proc.terminate()
