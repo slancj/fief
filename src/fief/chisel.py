@@ -3,16 +3,13 @@
 from __future__ import annotations
 
 import gzip
-import io
-import os
 import platform
-import shutil
-import stat
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
 from .fetch import fetch, verify_sha256
+from .store import bin_dir, machine_arch, write_executable
 
 MACHINE_TO_ARCH = {
     "x86_64": "amd64",
@@ -36,11 +33,7 @@ def target_triple(
         os_part = OS_NAMES[os_name]
     except KeyError:
         raise RuntimeError(f"unsupported OS for chisel fetch: {os_name!r}")
-    try:
-        arch = MACHINE_TO_ARCH[machine]
-    except KeyError:
-        raise RuntimeError(f"unsupported CPU for chisel fetch: {machine!r}")
-    return os_part, arch
+    return os_part, machine_arch(MACHINE_TO_ARCH, "chisel", machine)
 
 
 def asset_name(version: str, os_name: str, arch: str) -> str:
@@ -61,11 +54,7 @@ def parse_checksum(sums_text: str, gz_name: str) -> str | None:
 
 
 def default_bin_dir() -> Path:
-    override = os.environ.get("FIEF_BIN_DIR")
-    if override:
-        return Path(override)
-    cache = os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
-    return Path(cache) / "fief" / "bin"
+    return bin_dir()
 
 
 def ensure_chisel(
@@ -98,8 +87,6 @@ def ensure_chisel(
     if not want:
         raise RuntimeError("checksum entry not found for " + gz_name)
     got = verify_sha256(gz_data, want, gz_name)
-    with gzip.open(io.BytesIO(gz_data), "rb") as src, open(target, "wb") as dst:
-        shutil.copyfileobj(src, dst)
-    target.chmod(target.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    write_executable(target, gzip.decompress(gz_data), emit)
     emit(f"chisel {version} verified (sha256 {got[:12]}...)")
     return target

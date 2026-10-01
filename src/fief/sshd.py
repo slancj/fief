@@ -19,13 +19,11 @@ import subprocess
 from collections.abc import Callable
 from pathlib import Path
 
+from .store import cache_dir
+
 
 def _keydir() -> Path:
-    override = os.environ.get("FIEF_SSH_DIR")
-    if override:
-        return Path(override)
-    cache = os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
-    return Path(cache) / "fief" / "ssh"
+    return cache_dir("FIEF_SSH_DIR", "ssh")
 
 
 def _find_sshd() -> Path | None:

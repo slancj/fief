@@ -13,29 +13,24 @@ from __future__ import annotations
 import base64
 import json
 import os
-import platform
 import re
-import shlex
-import shutil
 import signal
-import stat
 import subprocess
 import tarfile
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
 
+from .config import DEFAULT_MESH_VERSION, MeshConfig, mesh_config_from_env
 from .fetch import fetch, verify_sha256
 from .log import LogBuffer
+from .store import bin_dir, cache_dir, machine_arch, write_executable
 
 LOG = LogBuffer()
 STOP = threading.Event()
 
-DEFAULT_MESH_VERSION = "1.102.4"
-DEFAULT_PROXY_PORT = "1055"
 BIN_CLI_NAME = "fiefmesh"
 BIN_DAEMON_NAME = "fiefmeshd"
 
@@ -70,11 +65,7 @@ def _clean(text: str) -> str:
 
 
 def target_arch(machine: str | None = None) -> str:
-    machine = machine or platform.machine()
-    try:
-        return MACHINE_TO_ARCH[machine]
-    except KeyError:
-        raise RuntimeError(f"unsupported CPU for mesh fetch: {machine!r}")
+    return machine_arch(MACHINE_TO_ARCH, "mesh", machine)
 
 
 def tarball_name(version: str, arch: str) -> str:
@@ -82,19 +73,11 @@ def tarball_name(version: str, arch: str) -> str:
 
 
 def default_bin_dir() -> Path:
-    override = os.environ.get("FIEF_BIN_DIR")
-    if override:
-        return Path(override)
-    cache = os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
-    return Path(cache) / "fief" / "bin"
+    return bin_dir()
 
 
 def default_run_dir() -> Path:
-    override = os.environ.get("FIEF_RUN_DIR")
-    if override:
-        return Path(override)
-    cache = os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
-    return Path(cache) / "fief" / "run" / "mesh"
+    return cache_dir("FIEF_RUN_DIR", "run", "mesh")
 
 
 def ensure_mesh(
@@ -130,51 +113,10 @@ def ensure_mesh(
             dest = target / (BIN_CLI_NAME if name == _BRAND else BIN_DAEMON_NAME)
             src = tf.extractfile(member)
             assert src is not None
-            with open(dest, "wb") as dst:
-                shutil.copyfileobj(src, dst)
-            dest.chmod(dest.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP)
+            write_executable(dest, src.read(), emit)
     marker.write_text(version + "\n")
     emit(f"mesh {version} verified (sha256 {got[:12]}...)")
     return cli, daemon
-
-
-@dataclass(frozen=True)
-class MeshConfig:
-    authkey: str = ""
-    hostname: str = "fief-node"
-    proxy: str = ""  # socks5h://127.0.0.1:1081, or "" for direct
-    serve_ports: tuple[str, ...] = ()
-    advertise_exit: bool = False
-    routes: tuple[str, ...] = ()
-    accept_dns: bool = False
-    ssh: bool = False
-    extra_args: tuple[str, ...] = ()
-    version: str = DEFAULT_MESH_VERSION
-    proxy_port: str = DEFAULT_PROXY_PORT
-    run_dir: Path | None = None
-
-
-def _split_list(value: str) -> tuple[str, ...]:
-    return tuple(p.strip() for p in value.split(",") if p.strip())
-
-
-def mesh_config_from_env() -> MeshConfig:
-    return MeshConfig(
-        authkey=os.environ.get("FIEF_MESH_KEY", ""),
-        hostname=os.environ.get("FIEF_MESH_HOSTNAME", "fief-node"),
-        proxy=os.environ.get("FIEF_MESH_PROXY", ""),
-        serve_ports=_split_list(os.environ.get("FIEF_MESH_SERVE", "")),
-        advertise_exit=os.environ.get("FIEF_MESH_ADVERTISE_EXIT", "0") == "1",
-        routes=_split_list(os.environ.get("FIEF_MESH_ROUTES", "")),
-        accept_dns=os.environ.get("FIEF_MESH_ACCEPT_DNS", "0") == "1",
-        ssh=os.environ.get("FIEF_MESH_SSH", "0") == "1",
-        extra_args=tuple(shlex.split(os.environ.get("FIEF_MESH_EXTRA_ARGS", ""))),
-        version=os.environ.get("FIEF_MESH_VERSION", DEFAULT_MESH_VERSION),
-        proxy_port=os.environ.get("FIEF_MESH_PROXY_PORT", DEFAULT_PROXY_PORT),
-        run_dir=Path(os.environ["FIEF_RUN_DIR"])
-        if os.environ.get("FIEF_RUN_DIR")
-        else None,
-    )
 
 
 def daemon_env(proxy: str) -> dict[str, str]:

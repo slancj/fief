@@ -27,7 +27,8 @@ def build_parser() -> argparse.ArgumentParser:
     fwd.add_argument(
         "--no-ssh",
         action="store_true",
-        help="skip the 2222 sshd forward (hubs without SSH_PUBKEY)",
+        help="skip the 2222 sshd forward (hubs without SSH_PUBKEY); "
+        "same as FIEF_NO_SSH=1",
     )
 
     mesh = sub.add_parser("mesh", help="mesh node via fief")

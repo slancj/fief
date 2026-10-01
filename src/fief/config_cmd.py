@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -33,6 +34,21 @@ def sops_bin() -> str:
 def load_nodes(path: Path | None = None) -> dict:
     with open(path or NODES_FILE, "rb") as f:
         return tomllib.load(f)
+
+
+def assert_encrypted(path: Path | None = None) -> None:
+    """Refuse plaintext: the committed secrets file must carry a sops envelope."""
+    target = path or SECRETS_FILE
+    if not target.exists():
+        raise SystemExit(
+            f"{target} missing — copy config/secrets.example.yaml over it and "
+            "encrypt with `sops config/secrets.yaml`"
+        )
+    text = target.read_text()
+    if not re.search(r"(?m)^sops:", text) or "age:" not in text:
+        raise SystemExit(
+            f"{target} has no sops age envelope — refusing (encrypt it first)"
+        )
 
 
 def decrypt_secrets(path: Path | None = None) -> dict[str, str]:

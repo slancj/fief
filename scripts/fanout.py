@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
 import urllib.request
 from pathlib import Path
@@ -23,23 +22,14 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE / "src"))
 
-from fief.config_cmd import load_nodes
+from fief.config_cmd import assert_encrypted, load_nodes
 
 RENDER_API = "https://api.render.com/v1"
 
 
 def check_envelope(path: Path) -> None:
     """Refuse plaintext: the committed file must be sops+age encrypted."""
-    if not path.exists():
-        raise SystemExit(
-            f"{path} missing — copy config/secrets.example.yaml over it and "
-            "encrypt with `sops config/secrets.yaml`"
-        )
-    text = path.read_text()
-    if not re.search(r"(?m)^sops:", text) or "age:" not in text:
-        raise SystemExit(
-            f"{path} has no sops age envelope — refusing (encrypt it first)"
-        )
+    assert_encrypted(path)
 
 
 def fanout_hf(
