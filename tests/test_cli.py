@@ -19,3 +19,20 @@ def test_subcommands():
 def test_requires_subcommand():
     with pytest.raises(SystemExit):
         build_parser().parse_args([])
+
+
+def test_every_subcommand_dispatches():
+    p = build_parser()
+    for argv in (
+        ["hub"],
+        ["exit"],
+        ["forward"],
+        ["version"],
+        ["mesh", "up"],
+        ["mesh", "down"],
+        ["mesh", "status"],
+        ["config", "export", "--node", "hf"],
+        ["config", "get", "CHISEL_AUTH"],
+        ["config", "edit"],
+    ):
+        assert callable(p.parse_args(argv).func), argv

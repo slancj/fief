@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import subprocess
 import time
 from pathlib import Path
@@ -11,6 +12,31 @@ from .config import ClientConfig, client_config_from_env
 from .log import LogBuffer
 
 LOG = LogBuffer()
+
+
+def register(sub: argparse._SubParsersAction) -> None:
+    sub.add_parser(
+        "exit",
+        help="run a LAN exit node (reverse SOCKS on the hub, reconnect loop)",
+    ).set_defaults(func=run_exit)
+    fwd = sub.add_parser(
+        "forward", help="open local forwards over one client connection"
+    )
+    fwd.add_argument(
+        "--no-ssh",
+        action="store_true",
+        help="skip the 2222 sshd forward (hubs without SSH_PUBKEY); "
+        "same as FIEF_NO_SSH=1",
+    )
+    fwd.set_defaults(func=run_forward)
+
+
+def run_exit(args: argparse.Namespace) -> int:
+    return cmd_exit()
+
+
+def run_forward(args: argparse.Namespace) -> int:
+    return cmd_forward(no_ssh=args.no_ssh)
 
 
 def _binary(cfg: ClientConfig) -> Path:

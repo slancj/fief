@@ -18,6 +18,7 @@ on:
       - "hf-space/**"
       - "src/**"
       - "scripts/assemble_hf_space.py"
+      - "scripts/sync_hf_space.py"
       - ".github/workflows/deploy-hf-space.yml"
   workflow_dispatch:
 
@@ -37,33 +38,4 @@ jobs:
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
-        run: |
-          python - <<'EOF'
-          import os
-          from huggingface_hub import HfApi
-
-          space_id = os.environ.get("HF_SPACE_ID", "")
-          if "/" not in space_id:
-              raise SystemExit(
-                  "Set the HF_SPACE_ID repo variable, e.g. '<owner>/<name>'"
-              )
-          sha = os.environ.get("GITHUB_SHA", "local")[:12]
-          api = HfApi(token=os.environ["HF_TOKEN"])
-          try:
-              api.create_repo(
-                  space_id,
-                  repo_type="space",
-                  space_sdk="gradio",
-                  private=True,
-                  exist_ok=True,
-              )
-          except Exception as exc:  # e.g. 402: API refused creation
-              print(f"warning: create_repo failed ({exc}); continuing to sync")
-          info = api.upload_folder(
-              repo_id=space_id,
-              repo_type="space",
-              folder_path="dist/space",
-              commit_message=f"sync from fief@{sha}",
-          )
-          print("deployed:", info.commit_url)
-          EOF
+        run: python scripts/sync_hf_space.py

@@ -44,7 +44,7 @@ stdlib page otherwise). `$CHISEL_AUTH` is the only required secret — env var
    `R:127.0.0.1:1080=>socks: Listening`.
 3. Consumer: `CHISEL_AUTH='user:...' fief forward`.
    Expect `tun: proxy#1080=>1080: Listening` then `Connected`.
-   (`--no-ssh` on hubs without `SSH_PUBKEY` set.)
+    (`--no-ssh`, or `FIEF_NO_SSH=1`, on hubs without `SSH_PUBKEY` set.)
 4. Use it: `proxychains xfreerdp /v:<lan-ip> /u:<user>`
    (or `proxychains curl http://<lan-ip>/` to smoke-test).
    `proxychains` must point at port `1080` for LAN exits.
@@ -59,13 +59,15 @@ Point a second proxychains profile (or `curl -x`) at `1081` for browsing.
 
 ## Shell on the hub via chisel
 
-Any hub runs `sshd` (key-only, localhost-only, container port 2222) when
-`SSH_PUBKEY` is set. `fief forward` maps it to localhost:2222 (drop it
-with `--no-ssh` on hubs without `SSH_PUBKEY`):
+Any hub with an sshd binary runs it (key-only, localhost-only, container
+port 2222) when `SSH_PUBKEY` is set. `fief forward` maps it to
+localhost:2222 (drop it with `--no-ssh` / `FIEF_NO_SSH=1` on hubs without
+`SSH_PUBKEY`):
 
 ```sh
 ssh -p 2222 fief@127.0.0.1    # Docker hubs (Render, Pi/compose): user fief
-ssh -p 2222 user@127.0.0.1    # HF Space: container user, not fief
+
+# HF Space has no sshd binary — shell there is via tailnet SSH (see Mesh).
 ```
 
 Non-root hubs (HF, uid 1000) serve the container user — sshd can't setuid

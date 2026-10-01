@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
@@ -19,6 +20,26 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 NODES_FILE = REPO_ROOT / "config" / "nodes.toml"
 SECRETS_FILE = REPO_ROOT / "config" / "secrets.yaml"
+
+
+def register(sub: argparse._SubParsersAction) -> None:
+    cfg = sub.add_parser("config", help="one-place config (nodes.toml + secrets)")
+    cfg_sub = cfg.add_subparsers(dest="config_cmd", required=True)
+    export = cfg_sub.add_parser("export", help="render dotenv for a node")
+    export.add_argument("--node", required=True)
+    export.set_defaults(func=run)
+    get = cfg_sub.add_parser("get", help="print one decrypted secret")
+    get.add_argument("key")
+    get.set_defaults(func=run)
+    cfg_sub.add_parser("edit", help="edit secrets.yaml in sops").set_defaults(func=run)
+
+
+def run(args: argparse.Namespace) -> int:
+    if args.config_cmd == "export":
+        return cmd_export(args.node)
+    if args.config_cmd == "get":
+        return cmd_get(args.key)
+    return cmd_edit()
 
 
 def sops_bin() -> str:

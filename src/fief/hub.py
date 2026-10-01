@@ -8,6 +8,7 @@ With ui=none no --backend is passed and chisel serves /health itself.
 
 from __future__ import annotations
 
+import argparse
 import threading
 import time
 import urllib.request
@@ -27,6 +28,16 @@ STOP = threading.Event()
 
 _started_at = time.time()
 _chisel_state = {"running": False, "restarts": 0}
+
+
+def register(sub: argparse._SubParsersAction) -> None:
+    sub.add_parser(
+        "hub", help="run the tunnel hub (chisel server + status UI)"
+    ).set_defaults(func=run)
+
+
+def run(args: argparse.Namespace) -> int:
+    return main()
 
 
 def status_text(cfg: HubConfig, hub_url: str) -> str:

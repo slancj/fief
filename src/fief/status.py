@@ -36,8 +36,8 @@ def make_handler(
                 return
             status, logs = snapshot()
             page = (
-                "<!doctype html><html><head><title>fief-relay</title></head>"
-                "<body><h1>fief-relay hub</h1>"
+                "<!doctype html><html><head><title>fief monitor</title></head>"
+                "<body><h1>fief monitor hub</h1>"
                 "<h2>Status</h2><pre>" + html.escape(status) + "</pre>"
                 "<h2>Recent log</h2><pre>" + html.escape(logs) + "</pre>"
                 "</body></html>"

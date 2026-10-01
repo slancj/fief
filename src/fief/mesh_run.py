@@ -8,6 +8,7 @@ terminating the child on stop or exception (never orphaned).
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import signal
@@ -33,6 +34,26 @@ from .store import cache_dir
 
 LOG = LogBuffer()
 STOP = threading.Event()
+
+
+def register(sub: argparse._SubParsersAction) -> None:
+    mesh = sub.add_parser("mesh", help="mesh node via fief")
+    mesh_sub = mesh.add_subparsers(dest="mesh_cmd", required=True)
+    mesh_sub.add_parser(
+        "up", help="join the mesh (foreground supervisor)"
+    ).set_defaults(func=run)
+    mesh_sub.add_parser("down", help="leave + stop the node").set_defaults(func=run)
+    status = mesh_sub.add_parser("status", help="mesh status")
+    status.add_argument("--json", action="store_true")
+    status.set_defaults(func=run)
+
+
+def run(args: argparse.Namespace) -> int:
+    if args.mesh_cmd == "up":
+        return run_mesh(log=LOG.log)
+    if args.mesh_cmd == "down":
+        return cmd_down()
+    return cmd_status(json_output=args.json)
 
 
 def default_run_dir() -> Path:

@@ -59,9 +59,9 @@ def build_ui(
     import gradio as gr
 
     if not auth_ok:
-        with gr.Blocks(title="fief-relay") as demo:
+        with gr.Blocks(title="fief monitor") as demo:
             _register_probe(gr)
-            gr.Markdown("# fief-relay hub (not configured)")
+            gr.Markdown("# fief monitor hub (not configured)")
             gr.Markdown(
                 "Set the `CHISEL_AUTH` secret (format `user:secret`) "
                 "in this service's environment, then restart.\n\n"
@@ -69,9 +69,9 @@ def build_ui(
             )
         return demo
 
-    with gr.Blocks(title="fief-relay") as demo:
+    with gr.Blocks(title="fief monitor") as demo:
         _register_probe(gr)
-        gr.Markdown("# fief-relay hub")
+        gr.Markdown("# fief monitor hub")
         gr.Markdown(
             f"Chisel hub on `{hub_url}`. Browser traffic here is proxied "
             "through chisel to this page; tunnel clients connect to the "

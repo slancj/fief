@@ -7,7 +7,7 @@ import urllib.request
 
 
 def fetch(url: str, timeout: int = 120) -> bytes:
-    req = urllib.request.Request(url, headers={"User-Agent": "fief-relay"})
+    req = urllib.request.Request(url, headers={"User-Agent": "fief"})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return resp.read()
 
