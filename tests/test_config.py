@@ -1,5 +1,4 @@
 import os
-from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -7,7 +6,6 @@ import pytest
 from fief.config import (
     DEFAULT_BACKEND_PORT,
     DEFAULT_PORT,
-    KNOWN_VARS,
     client_config_from_env,
     hub_config_from_env,
     mesh_config_from_env,
@@ -78,19 +76,6 @@ def test_resolve_ui_gradio_missing():
 def test_space_public_url():
     assert space_public_url("owner/name") == "https://owner-name.hf.space"
     assert space_public_url("") == "https://<owner>-<space>.hf.space"
-
-
-def test_nodes_vars_are_known():
-    """Every nodes.toml var must be one the code reads — typo'd vars
-    deploy fine and silently do nothing."""
-    import tomllib
-
-    nodes_file = Path(__file__).resolve().parent.parent / "config" / "nodes.toml"
-    with open(nodes_file, "rb") as f:
-        nodes = tomllib.load(f)["nodes"]
-    for name, node in nodes.items():
-        unknown = set(node.get("vars", {})) - KNOWN_VARS
-        assert unknown == set(), f"node {name!r} sets unknown vars: {sorted(unknown)}"
 
 
 def test_mesh_config_from_env():

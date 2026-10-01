@@ -26,6 +26,16 @@ def _assemble(tmp_path: Path) -> Path:
     return mod.assemble(tmp_path / "space")
 
 
+def _allowlist() -> set[str]:
+    spec = importlib.util.spec_from_file_location(
+        "assemble", REPO / "scripts" / "assemble_hf_space.py"
+    )
+    assert spec and spec.loader
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return set(mod.PAYLOAD_MODULES)
+
+
 def _payload_files(out: Path) -> list[Path]:
     return sorted(f for f in out.rglob("*") if f.is_file())
 
@@ -47,6 +57,9 @@ def test_no_banned_substrings(tmp_path):
 def test_excluded_modules_absent(tmp_path):
     out = _assemble(tmp_path)
     names = {f.name for f in _payload_files(out)}
+    shipped = {f.name for f in (out / "fief").iterdir() if f.is_file()}
+    # The shipped package IS the allowlist — no restating it here.
+    assert shipped == _allowlist(), shipped ^ _allowlist()
     for banned in (
         "tail.py",
         "mesh.py",
@@ -57,8 +70,7 @@ def test_excluded_modules_absent(tmp_path):
     ):
         assert banned not in names, banned
     assert "hub.py" in names and "app.py" in names
-    for required in ("mesh_fetch.py", "mesh_run.py", "store.py", "proc.py"):
-        assert required in names, f"sidecar needs {required} or HF nodes never join"
+    assert "mesh_run.py" in names, "sidecar must ship or HF nodes never join"
 
 
 def test_hub_still_functional(tmp_path):

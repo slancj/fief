@@ -1,5 +1,6 @@
 import pytest
 
+from fief.config import DEFAULT_MESH_VERSION as V
 from fief.fetch import verify_sha256
 from fief.mesh_fetch import tarball_name, target_arch
 
@@ -15,8 +16,8 @@ def test_target_arch():
 
 
 def test_tarball_name():
-    assert tarball_name("1.102.4", "amd64") == "tailscale_1.102.4_amd64.tgz"
-    assert tarball_name("1.102.4", "arm64") == "tailscale_1.102.4_arm64.tgz"
+    assert tarball_name(V, "amd64") == f"tailscale_{V}_amd64.tgz"
+    assert tarball_name(V, "arm64") == f"tailscale_{V}_arm64.tgz"
 
 
 def test_sensitive_literals_decode():
@@ -54,7 +55,7 @@ def test_verify_sha256_with_filename():
     import hashlib
 
     data = b"hello-mesh"
-    want = hashlib.sha256(data).hexdigest() + "  tailscale_1.102.4_amd64.tgz\n"
+    want = hashlib.sha256(data).hexdigest() + f"  tailscale_{V}_amd64.tgz\n"
     assert verify_sha256(data, want, "x") == hashlib.sha256(data).hexdigest()
 
 

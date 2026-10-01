@@ -122,6 +122,7 @@ userspace daemon everywhere — no root, no TUN, no system changes.
    routes need admin approval, or tag auto-approvers). Persist with
    systemd/tmux.
 4. Verify: `fief mesh status` / admin console shows the nodes.
+   Leave with `fief mesh down`. (`fief version` prints the build.)
 
 Sleeping free-tier hubs drop off the mesh until woken via public URL.
 Use tags (not IPs) in ACLs — ephemeral cloud nodes get new IPs each boot.
