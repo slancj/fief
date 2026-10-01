@@ -8,8 +8,6 @@ With ui=none no --backend is passed and chisel serves /health itself.
 
 from __future__ import annotations
 
-import signal
-import subprocess
 import threading
 import time
 import urllib.request
@@ -20,6 +18,7 @@ from . import __version__
 from .chisel import ensure_chisel
 from .config import HubConfig, hub_config_from_env, resolve_ui, space_public_url
 from .log import LogBuffer
+from .proc import drain, spawn, wire_stop
 from .sshd import maybe_start_sshd
 from .status import serve_forever as serve_status
 
@@ -74,22 +73,12 @@ def run_chisel(binary: Path, cfg: HubConfig) -> int:
     if cfg.ui != "none":
         cmd += ["--backend", f"http://127.0.0.1:{cfg.backend_port}"]
     LOG.log(f"starting: chisel server --port {cfg.port} --reverse --socks5")
-    proc = subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
-    assert proc.stdout is not None
+    proc = spawn(cmd)
     _chisel_state["running"] = True
-    for line in proc.stdout:
-        LOG.log("chisel | " + line.rstrip())
-        if STOP.is_set():
-            break
-    _chisel_state["running"] = False
-    if STOP.is_set():
-        proc.terminate()
+    try:
+        drain(proc, lambda line: LOG.log("chisel | " + line), STOP)
+    finally:
+        _chisel_state["running"] = False
     return proc.wait(timeout=30)
 
 
@@ -118,10 +107,10 @@ def _maybe_start_tail() -> None:
     boot; absence is a clean skip, not an error.
     """
     try:
-        from . import mesh as mesh_mod
+        from . import mesh_run as mesh_mod
     except ImportError:
         return
-    mesh_mod.maybe_start_from_env(log=LOG.log)
+    mesh_mod.maybe_start_from_env(log=LOG.log, stop=STOP)
 
 
 def snapshot(cfg: HubConfig, hub_url: str) -> tuple[str, str]:
@@ -129,8 +118,7 @@ def snapshot(cfg: HubConfig, hub_url: str) -> tuple[str, str]:
 
 
 def main(cfg: HubConfig | None = None) -> int:
-    signal.signal(signal.SIGTERM, lambda *_: STOP.set())
-    signal.signal(signal.SIGINT, lambda *_: STOP.set())
+    wire_stop(STOP)
 
     cfg = cfg or hub_config_from_env()
     hub_url = space_public_url()

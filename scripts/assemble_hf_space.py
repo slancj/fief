@@ -17,9 +17,10 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 
 # Explicit allowlist: ONLY these modules ship to HF. The mesh joiner ships
-# too (scrubbed: vendor names/flags stay base64-encoded, see
-# tests/test_hf_payload_clean.py) because the hub sidecar is what joins
-# cloud nodes to the mesh. CLI, clients, and config tooling stay out.
+# as mesh_fetch (scrubbed literals) + mesh_run (supervisor), plus store and
+# proc which they build on (see tests/test_hf_payload_clean.py), because the
+# hub sidecar is what joins cloud nodes to the mesh. CLI, clients, and
+# config tooling stay out.
 PAYLOAD_MODULES = (
     "__init__.py",
     "hub.py",
@@ -27,7 +28,10 @@ PAYLOAD_MODULES = (
     "fetch.py",
     "config.py",
     "log.py",
-    "mesh.py",
+    "store.py",
+    "proc.py",
+    "mesh_fetch.py",
+    "mesh_run.py",
     "sshd.py",
     "status.py",
     "ui_gradio.py",

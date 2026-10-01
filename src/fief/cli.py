@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> int:
 
         return cmd_forward(no_ssh=args.no_ssh)
     if args.cmd == "mesh":
-        from . import mesh as mesh_mod
+        from . import mesh_run as mesh_mod
 
         if args.mesh_cmd == "up":
             return mesh_mod.run_mesh(log=mesh_mod.LOG.log)

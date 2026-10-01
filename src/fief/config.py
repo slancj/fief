@@ -71,6 +71,43 @@ def space_public_url(space_id: str = "") -> str:
     return "https://<owner>-<space>.hf.space"
 
 
+#: Every env name the codebase reads. nodes.toml vars must be a subset —
+#: a typo'd var deploys fine and silently does nothing (enforced by test).
+KNOWN_VARS = frozenset(
+    {
+        "CHISEL_AUTH",
+        "CHISEL_KEEPALIVE",
+        "CHISEL_VERSION",
+        "SSH_PUBKEY",
+        "SSH_PORT",
+        "SSH_USER",
+        "PORT",
+        "BACKEND_PORT",
+        "FIEF_UI",
+        "FIEF_BIN_DIR",
+        "FIEF_RUN_DIR",
+        "FIEF_SSH_DIR",
+        "FIEF_NO_SSH",
+        "FIEF_MESH_KEY",
+        "FIEF_MESH_HOSTNAME",
+        "FIEF_MESH_PROXY",
+        "FIEF_MESH_SERVE",
+        "FIEF_MESH_ADVERTISE_EXIT",
+        "FIEF_MESH_ROUTES",
+        "FIEF_MESH_ACCEPT_DNS",
+        "FIEF_MESH_SSH",
+        "FIEF_MESH_EXTRA_ARGS",
+        "FIEF_MESH_VERSION",
+        "FIEF_MESH_PROXY_PORT",
+        "HUB_URL",
+        "LOCAL_PORT",
+        "EGRESS_PORT",
+        "EXIT_SOCKS",
+        "SPACE_ID",
+    }
+)
+
+
 def _flag(name: str) -> bool:
     return os.environ.get(name, "0") == "1"
 

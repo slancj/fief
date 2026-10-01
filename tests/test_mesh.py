@@ -1,14 +1,13 @@
 import pytest
 
 from fief.fetch import verify_sha256
-from fief.mesh import (
+from fief.mesh_fetch import tarball_name, target_arch
+from fief.mesh_run import (
     build_daemon_cmd,
     build_serve_cmds,
     build_up_cmd,
     daemon_env,
     mesh_config_from_env,
-    tarball_name,
-    target_arch,
 )
 
 
@@ -31,7 +30,7 @@ def test_sensitive_literals_decode():
     # Expected values name the real vendor/flags; the shipped copy keeps
     # them base64-encoded and only decodes at runtime
     # (see test_hf_payload_clean.py).
-    from fief import mesh as mesh_mod
+    from fief import mesh_fetch as mesh_mod
 
     assert mesh_mod._BRAND == "tailscale"
     assert mesh_mod._PKG_HOST == "https://pkgs.tailscale.com/stable"
@@ -43,7 +42,7 @@ def test_sensitive_literals_decode():
 
 
 def test_clean_neutralizes_vendor_words():
-    from fief.mesh import _clean
+    from fief.mesh_fetch import _clean
 
     assert _clean("tailscaled | wgengine ok") == "meshd | wgengine ok"
     assert _clean("TAILSCALE_AUTHKEY missing") == "mesh_AUTHKEY missing"
@@ -167,7 +166,7 @@ def test_build_serve_cmds(tmp_path):
 
 
 def test_run_mesh_needs_key(monkeypatch):
-    from fief.mesh import run_mesh
+    from fief.mesh_run import run_mesh
 
     monkeypatch.delenv("FIEF_MESH_KEY", raising=False)
     assert run_mesh() == 2

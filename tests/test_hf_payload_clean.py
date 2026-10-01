@@ -2,9 +2,10 @@
 
 Assembles the real Space payload and greps every file. Banned list covers
 the vendor name (any case), its domain, env-style prefixes, key prefixes,
-and the distinctive flags. mesh.py SHIPS (scrubbed: sensitive literals stay
-base64-encoded, decoded only at runtime) because the hub sidecar is what
-joins cloud nodes. Chisel MUST still be present (non-vacuous).
+and the distinctive flags. mesh_fetch.py SHIPS (scrubbed: sensitive
+literals stay base64-encoded, decoded only at runtime) with mesh_run.py,
+store.py, and proc.py, because the hub sidecar is what joins cloud nodes.
+Chisel MUST still be present (non-vacuous).
 """
 
 import importlib.util
@@ -48,6 +49,7 @@ def test_excluded_modules_absent(tmp_path):
     names = {f.name for f in _payload_files(out)}
     for banned in (
         "tail.py",
+        "mesh.py",
         "cli.py",
         "client.py",
         "config_cmd.py",
@@ -55,7 +57,8 @@ def test_excluded_modules_absent(tmp_path):
     ):
         assert banned not in names, banned
     assert "hub.py" in names and "app.py" in names
-    assert "mesh.py" in names, "sidecar must ship or HF nodes never join"
+    for required in ("mesh_fetch.py", "mesh_run.py", "store.py", "proc.py"):
+        assert required in names, f"sidecar needs {required} or HF nodes never join"
 
 
 def test_hub_still_functional(tmp_path):
