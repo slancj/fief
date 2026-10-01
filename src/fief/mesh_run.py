@@ -123,6 +123,24 @@ def build_serve_cmds(cli: Path, sock: Path, ports: tuple[str, ...]) -> list[list
     ]
 
 
+def check_serve_target(port: str, emit: Callable[[str], None] | None = None) -> bool:
+    """Probe the container-local backend a serve forward points at.
+
+    Serve accepts mesh connections even when the backend is dead (the
+    client sees a reset), so verify the listener exists and warn plainly
+    instead of leaving a silent void. Uses stdlib sockets, no new deps.
+    """
+    import socket
+
+    log = emit or (lambda msg: None)
+    try:
+        with socket.create_connection(("127.0.0.1", int(port)), timeout=5):
+            return True
+    except (OSError, ValueError):
+        log(f"serve target 127.0.0.1:{port} closed (exit node offline?)")
+        return False
+
+
 def _wait_socket(
     sock: Path, proc: subprocess.Popen, stop: threading.Event, timeout: int = 30
 ) -> None:
@@ -226,6 +244,8 @@ def run_mesh(
                     emit(
                         f"serve {' '.join(cmd[4:])}: {'ok' if r.returncode == 0 else 'warn: ' + detail}"
                     )
+                for p in cfg.serve_ports:
+                    check_serve_target(p, emit)
             except RuntimeError as exc:
                 emit(_clean(str(exc)))
                 proc.terminate()

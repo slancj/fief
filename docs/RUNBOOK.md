@@ -93,6 +93,15 @@ userspace daemon everywhere — no root, no TUN, no system changes.
    `FIEF_MESH_SERVE=1080,1081`) as env/secret and restart. Sidecar joins
    and serves the SOCKS ports on the node's mesh IPs:
    `curl -x socks5h://<hub-mesh-ip>:1081 ifconfig.me`.
+   Port truth: `1080` is the LAN exit — it exists only while an exit
+   node holds the hub's reverse remote (`R:socks` binds the hub's
+   default socks port). `1081` is the hub's own egress listener
+   (stdlib SOCKS5 in the hub process, `EGRESS_PORT`, direct connection
+   + server-side DNS). After serve setup the sidecar probes each
+   container-local target and warns (`serve target ... closed`) when a
+   forward points at a dead port — e.g. 1080 with the exit offline.
+   FoxyProxy over the tailnet: SOCKS5 to `<hub-mesh-ip>:1080/1081`
+   with remote DNS on; the mesh ACL is the auth, so keep grants tight.
     Optional: `FIEF_MESH_ADVERTISE_EXIT=1` offers the hub as exit node
     (approve in admin console).
     Optional: `FIEF_MESH_SSH=1` enables tailnet SSH on the node

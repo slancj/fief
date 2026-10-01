@@ -30,6 +30,7 @@ class HubConfig:
     ssh_pubkey: str = ""
     ssh_port: str = "2222"
     ssh_user: str = "fief"  # login user when root; non-root serves its own user
+    egress_port: str = "1081"  # hub-local SOCKS egress (mesh-serve target)
 
 
 def hub_config_from_env() -> HubConfig:
@@ -43,6 +44,7 @@ def hub_config_from_env() -> HubConfig:
         ssh_pubkey=os.environ.get("SSH_PUBKEY", ""),
         ssh_port=os.environ.get("SSH_PORT", "2222"),
         ssh_user=os.environ.get("SSH_USER", "fief"),
+        egress_port=os.environ.get("EGRESS_PORT", "1081"),
     )
 
 

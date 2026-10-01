@@ -18,6 +18,7 @@ from pathlib import Path
 from . import __version__
 from .chisel import ensure_chisel
 from .config import HubConfig, hub_config_from_env, resolve_ui, space_public_url
+from .egress import start_egress_server
 from .log import LogBuffer
 from .proc import drain, spawn, wire_stop
 from .sshd import maybe_start_sshd
@@ -156,6 +157,7 @@ def main(cfg: HubConfig | None = None) -> int:
 
     maybe_start_sshd(cfg.ssh_pubkey, cfg.ssh_port, cfg.ssh_user, log=LOG.log)
     _maybe_start_tail()
+    start_egress_server(cfg.egress_port, STOP, LOG.log)
     binary = ensure_chisel(cfg.version, log=LOG.log)
 
     backoff = 5

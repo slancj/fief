@@ -32,6 +32,7 @@ PAYLOAD_MODULES = (
     "proc.py",
     "mesh_fetch.py",
     "mesh_run.py",
+    "egress.py",
     "sshd.py",
     "status.py",
     "ui_gradio.py",

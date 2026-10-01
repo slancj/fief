@@ -3,6 +3,7 @@ from fief.mesh_run import (
     build_daemon_cmd,
     build_serve_cmds,
     build_up_cmd,
+    check_serve_target,
     daemon_env,
 )
 
@@ -107,3 +108,36 @@ def test_run_mesh_needs_key(monkeypatch):
 
     monkeypatch.delenv("FIEF_MESH_KEY", raising=False)
     assert run_mesh() == 2
+
+
+def test_check_serve_target_open():
+    import socket
+
+    srv = socket.socket()
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = str(srv.getsockname()[1])
+    logs: list[str] = []
+    try:
+        assert check_serve_target(port, logs.append) is True
+    finally:
+        srv.close()
+    assert logs == []
+
+
+def test_check_serve_target_closed():
+    import socket
+
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = str(s.getsockname()[1])
+    logs: list[str] = []
+    assert check_serve_target(port, logs.append) is False
+    assert logs == [f"serve target 127.0.0.1:{port} closed (exit node offline?)"]
+
+
+def test_check_serve_target_garbage():
+    logs: list[str] = []
+    assert check_serve_target("notaport", logs.append) is False
+    assert len(logs) == 1
