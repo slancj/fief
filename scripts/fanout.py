@@ -5,10 +5,10 @@ Targets are declared per node in config/nodes.toml (`deploy` tags); this
 script only knows the target KINDS below. Service IDs stay in env.
 Unknown --targets entries or node tags fail fast.
 
-Inputs (env, all optional per target — missing creds skip that target):
+Inputs (env — credentials and ID overrides only; nodes.toml is the default):
   SECRETS_JSON   path to sops-decrypted secrets.yaml as JSON (CI decrypts first)
-  HF_TOKEN / HF_SPACE_ID
-  RENDER_API_KEY / RENDER_SERVICE_ID / RENDER_REDEPLOY (default 1)
+  HF_TOKEN / HF_SPACE_ID (override for nodes' space_id)
+  RENDER_API_KEY / RENDER_SERVICE_ID (override) / RENDER_REDEPLOY (default 1)
 
 Refuses to run unless config/secrets.yaml carries a sops age envelope
 (guards against fanning out a forgotten-plaintext file).
@@ -141,61 +141,74 @@ def main(argv: list[str] | None = None) -> int:
     def tagged(kind: str) -> list[tuple[str, dict]]:
         return [(n, d) for n, d in nodes.items() if kind in d.get("deploy", [])]
 
-    hf_token, space_id = (
-        os.environ.get("HF_TOKEN", ""),
-        os.environ.get("HF_SPACE_ID", ""),
-    )
-    render_key, service_id = (
-        os.environ.get("RENDER_API_KEY", ""),
-        os.environ.get("RENDER_SERVICE_ID", ""),
-    )
+    hf_token = os.environ.get("HF_TOKEN", "")
+    render_key = os.environ.get("RENDER_API_KEY", "")
 
     if "hf-space" in targets:
         hf_nodes = tagged("hf-space")
         if not hf_nodes:
             log("no node deploys to hf-space, skipped")
-        elif not args.dry_run and (not hf_token or "/" not in space_id):
-            log("HF skipped (need HF_TOKEN + HF_SPACE_ID)")
+        elif not args.dry_run and not hf_token:
+            log("HF skipped (need HF_TOKEN)")
         else:
-            if args.dry_run:
-                from unittest.mock import MagicMock
-
-                api = MagicMock()
-            else:
-                from huggingface_hub import HfApi
-
-                api = HfApi(token=hf_token)
+            api = None
             for name, node in hf_nodes:
-                log(f"node {name} -> space {space_id or '<space>'}")
-                fanout_hf(api, space_id or "<space>", node, secrets, args.dry_run, log)
+                sid = (
+                    os.environ.get("HF_SPACE_ID", "")
+                    or node.get("space_id", "")
+                    or "<space>"
+                )
+                if not args.dry_run and "/" not in sid:
+                    log(
+                        f"node {name} has no space_id, skipped "
+                        "(set nodes.toml space_id or HF_SPACE_ID)"
+                    )
+                    continue
+                if api is None:
+                    if args.dry_run:
+                        from unittest.mock import MagicMock
+
+                        api = MagicMock()
+                    else:
+                        from huggingface_hub import HfApi
+
+                        api = HfApi(token=hf_token)
+                log(f"node {name} -> space {sid}")
+                fanout_hf(api, sid, node, secrets, args.dry_run, log)
 
     if "render" in targets:
         render_nodes = tagged("render")
         if not render_nodes:
             log("no node deploys to render, skipped")
-        elif not args.dry_run and (not render_key or not service_id):
-            log("Render skipped (need RENDER_API_KEY + RENDER_SERVICE_ID)")
+        elif not args.dry_run and not render_key:
+            log("Render skipped (need RENDER_API_KEY)")
         else:
-            did_any = False
+            updated: set[str] = set()
             for name, node in render_nodes:
-                log(f"node {name} -> Render {service_id or '<service>'}")
-                did_any = (
-                    fanout_render(
-                        render_key,
-                        service_id or "<service>",
-                        node,
-                        secrets,
-                        args.dry_run,
-                        log,
-                    )
-                    or did_any
+                svc = (
+                    os.environ.get("RENDER_SERVICE_ID", "")
+                    or node.get("service_id", "")
+                    or "<service>"
                 )
+                if not args.dry_run and svc == "<service>":
+                    log(
+                        f"node {name} has no service_id, skipped "
+                        "(set nodes.toml service_id or RENDER_SERVICE_ID)"
+                    )
+                    continue
+                log(f"node {name} -> Render {svc}")
+                if (
+                    fanout_render(render_key, svc, node, secrets, args.dry_run, log)
+                    and not args.dry_run
+                ):
+                    updated.add(svc)
             if (
-                did_any
+                updated
                 and not args.dry_run
                 and os.environ.get("RENDER_REDEPLOY", "1") == "1"
             ):
-                render_redeploy(render_key, service_id, log)
+                for svc in sorted(updated):
+                    render_redeploy(render_key, svc, log)
     return 0
 
 

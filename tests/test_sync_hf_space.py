@@ -45,8 +45,26 @@ def test_sync_continues_when_create_refused():
     assert any("warning: create_repo failed" in line for line in logs)
 
 
-def test_main_requires_space_id(monkeypatch):
+def test_main_requires_space_id(monkeypatch, tmp_path):
     mod = load_sync()
     monkeypatch.delenv("HF_SPACE_ID", raising=False)
-    with pytest.raises(SystemExit, match="HF_SPACE_ID"):
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config" / "nodes.toml").write_text(
+        "[nodes.pi]\ndeploy = []\nvars = {}\nsecrets = []\n"
+    )
+    with pytest.raises(SystemExit, match="HF_SPACE_ID"), monkeypatch.context() as m:
+        m.setattr(mod, "HERE", tmp_path)
         mod.main(["--folder", "dist/space"])
+
+
+def test_resolve_space_id_precedence(tmp_path, monkeypatch):
+    mod = load_sync()
+    nodes = tmp_path / "nodes.toml"
+    nodes.write_text('[nodes.hf]\ndeploy = ["hf-space"]\nspace_id = "o/topo"\n')
+    monkeypatch.delenv("HF_SPACE_ID", raising=False)
+    assert mod.resolve_space_id("", nodes) == "o/topo"
+    monkeypatch.setenv("HF_SPACE_ID", "o/env")
+    assert mod.resolve_space_id("", nodes) == "o/env"
+    assert mod.resolve_space_id("o/cli", nodes) == "o/cli"
+    nodes.write_text("[nodes.pi]\ndeploy = []\nvars = {}\n")
+    assert mod.resolve_space_id("", nodes) == "o/env"

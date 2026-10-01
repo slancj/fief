@@ -4,9 +4,9 @@
 #   1. HF Settings -> Access Tokens: fine-grained token with Write on your
 #      (private) Space, e.g. "<owner>/<name>". A full-access token also
 #      works but can delete repos — prefer fine-grained.
-#   2. GitHub repo -> Settings -> Secrets and variables -> Actions:
-#        secret   HF_TOKEN    = the token from step 1
-#        variable HF_SPACE_ID = "<owner>/<name>"
+#   2. GitHub repo → Settings → Secrets and variables → Actions:
+#        secret HF_TOKEN = the token from step 1
+#        (optional) variable HF_SPACE_ID to override the nodes.toml space_id.
 # First run creates the Space if missing (private, gradio SDK) — unless
 # the API refuses creation (observed: 402 Payment Required), in which case
 # create the Space manually (private, Gradio SDK) and re-run: sync proceeds.
@@ -27,6 +27,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/python-env
       - name: Assemble Space payload
         run: uv run --no-project scripts/assemble_hf_space.py --out dist/space

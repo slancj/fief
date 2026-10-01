@@ -2,7 +2,10 @@
 # Secrets live in config/secrets.yaml (SOPS+age encrypted); each node below
 # lists which secret KEYS it needs — values never appear here.
 # `deploy` tags declare where fan-out (scripts/fanout.py) delivers the
-# node: "hf-space" (Space Secrets/Variables) and/or "render" (service env).
+# node: "hf-space" (Space Secrets/Variables) and/or "render" (service env),
+# with `space_id` / `service_id` right here as the address. Env
+# (HF_SPACE_ID, RENDER_SERVICE_ID) overrides per-node IDs when set — for
+# forks and CI — but the committed file is the default of record.
 # Nodes without tags (pi, laptop) are manual: render dotenv locally via
 # `fief config export --node <name> > .env`. Unknown tags fail fan-out —
 # this file owns the target list, not the script.
@@ -16,12 +19,14 @@
 [nodes.hf]
 # Hugging Face Space hub. Secrets -> Space Secrets, vars -> Variables.
 deploy = ["hf-space"]
+space_id = "AlisaAjer/fief-monitor"
 vars = { FIEF_MESH_HOSTNAME = "fief-monitor", FIEF_MESH_SERVE = "1080,1081", FIEF_MESH_SSH = "1" }
 secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.render]
 # Render web service (fief-relay). Secrets+vars -> service env (PUT per key).
 deploy = ["render"]
+# service_id = "srv-..."  # set when the Render service exists
 vars = { FIEF_MESH_HOSTNAME = "fief-render", FIEF_MESH_SERVE = "1080,1081" }
 secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 

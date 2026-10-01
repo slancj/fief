@@ -14,8 +14,10 @@ commit). Nothing secret lives in dashboards, `.env` files, or chat.
 * **Dry run**: Actions → `fanout` → Run workflow with dry_run (prints
   keys/targets, never values).
 * **Root secrets** (the only manual ones, they authenticate the fan-out
-  itself): GitHub `SOPS_AGE_KEY`, `HF_TOKEN`, `RENDER_API_KEY`
-  (+ `HF_SPACE_ID`, `RENDER_SERVICE_ID` variables). Age private key also
+  itself): GitHub `SOPS_AGE_KEY`, `HF_TOKEN`, `RENDER_API_KEY`.
+  Target addresses live in `nodes.toml` (`space_id`, `service_id`;
+  `HF_SPACE_ID` / `RENDER_SERVICE_ID` repo variables override them when
+  set). Age private key also
   lives at `~/.config/fief/age.key` on hosts. Tailscale key creation and
   route/exit approvals stay in the Tailscale console.
 

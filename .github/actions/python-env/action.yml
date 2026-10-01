@@ -1,11 +1,19 @@
-# Shared Python env: checkout + Python 3.12 via uv (no project sync —
-# callers add `uv sync` or `uv run --with ...` for their own deps).
+# Shared Python env: Python 3.12 via uv, optional frozen project sync.
+# NOTE:GH checks out the repo BEFORE local actions run, so callers must
+# keep their own `actions/checkout` step first — a local action cannot
+# check out the repo it lives in.
 name: python-env
-description: Checkout the repo and provide Python 3.12 through uv.
+description: Provide Python 3.12 through uv, optionally syncing the project.
+inputs:
+  sync:
+    description: Run uv sync --frozen after setup.
+    default: "false"
 runs:
   using: composite
   steps:
-    - uses: actions/checkout@v5
     - uses: astral-sh/setup-uv@v6
       with:
         python-version: "3.12"
+    - if: inputs.sync == 'true'
+      run: uv sync --frozen
+      shell: bash

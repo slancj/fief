@@ -22,6 +22,7 @@ jobs:
   fanout:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v5
       - uses: ./.github/actions/python-env
       - name: Install sops
         env:

@@ -163,8 +163,8 @@ def _write_repo_files(tmp_path):
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "secrets.yaml").write_text(SOPS_BLOB)
     (tmp_path / "config" / "nodes.toml").write_text(
-        '[nodes.hf]\ndeploy = ["hf-space"]\nvars = { FIEF_MESH_HOSTNAME = "fief-hf" }\nsecrets = ["CHISEL_AUTH"]\n'
-        '[nodes.render]\ndeploy = ["render"]\nvars = {}\nsecrets = ["CHISEL_AUTH"]\n'
+        '[nodes.hf]\ndeploy = ["hf-space"]\nspace_id = "o/n"\nvars = { FIEF_MESH_HOSTNAME = "fief-hf" }\nsecrets = ["CHISEL_AUTH"]\n'
+        '[nodes.render]\ndeploy = ["render"]\nservice_id = "srv-1"\nvars = {}\nsecrets = ["CHISEL_AUTH"]\n'
     )
     secrets_json = tmp_path / "secrets.json"
     secrets_json.write_text(json.dumps({"CHISEL_AUTH": "u:S3CR3T"}))
@@ -265,3 +265,40 @@ def test_main_untagged_kind_skipped(tmp_path, fanout, capsys):
         )
         assert fanout.main(_main_args(tmp_path, ["--targets", "render"])) == 0
     assert "no node deploys to render, skipped" in buf.getvalue()
+
+
+def test_main_uses_node_space_id(tmp_path, fanout):
+    _write_repo_files(tmp_path)
+    with redirect_stdout(io.StringIO()) as buf:
+        assert fanout.main(_main_args(tmp_path, ["--targets", "hf-space"])) == 0
+    assert "node hf -> space o/n" in buf.getvalue()
+
+
+def test_main_env_space_id_overrides(tmp_path, fanout, monkeypatch):
+    _write_repo_files(tmp_path)
+    monkeypatch.setenv("HF_SPACE_ID", "o/env")
+    with redirect_stdout(io.StringIO()) as buf:
+        assert fanout.main(_main_args(tmp_path, ["--targets", "hf-space"])) == 0
+    assert "node hf -> space o/env" in buf.getvalue()
+
+
+def test_main_missing_space_id_skipped(tmp_path, fanout, monkeypatch):
+    sj = _write_repo_files(tmp_path)
+    (tmp_path / "config" / "nodes.toml").write_text(
+        '[nodes.hf]\ndeploy = ["hf-space"]\nvars = {}\nsecrets = ["CHISEL_AUTH"]\n'
+    )
+    monkeypatch.setenv("HF_TOKEN", "tok")
+    monkeypatch.delenv("HF_SPACE_ID", raising=False)
+    args = [
+        "--secrets-json",
+        str(sj),
+        "--nodes",
+        str(tmp_path / "config" / "nodes.toml"),
+        "--secrets-file",
+        str(tmp_path / "config" / "secrets.yaml"),
+        "--targets",
+        "hf-space",
+    ]
+    with redirect_stdout(io.StringIO()) as buf:
+        assert fanout.main(args) == 0
+    assert "has no space_id, skipped" in buf.getvalue()
