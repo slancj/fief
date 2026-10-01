@@ -1,8 +1,11 @@
 # fief topology: ONE PLACE for per-node config (plaintext, committed).
 # Secrets live in config/secrets.yaml (SOPS+age encrypted); each node below
 # lists which secret KEYS it needs — values never appear here.
-# Fan-out (scripts/fanout.py) pushes secrets+vars to HF/Render;
-# hosts render dotenv via `fief config export --node <name> > .env`.
+# `deploy` tags declare where fan-out (scripts/fanout.py) delivers the
+# node: "hf-space" (Space Secrets/Variables) and/or "render" (service env).
+# Nodes without tags (pi, laptop) are manual: render dotenv locally via
+# `fief config export --node <name> > .env`. Unknown tags fail fan-out —
+# this file owns the target list, not the script.
 #
 # Per-node mesh toggles (FIEF_MESH_SSH etc.) are decided here, in each
 # node's `vars`. Fan-out pushes them as Space Variables / service env,
@@ -12,20 +15,24 @@
 
 [nodes.hf]
 # Hugging Face Space hub. Secrets -> Space Secrets, vars -> Variables.
+deploy = ["hf-space"]
 vars = { FIEF_MESH_HOSTNAME = "fief-monitor", FIEF_MESH_SERVE = "1080,1081", FIEF_MESH_SSH = "1" }
 secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.render]
 # Render web service (fief-relay). Secrets+vars -> service env (PUT per key).
+deploy = ["render"]
 vars = { FIEF_MESH_HOSTNAME = "fief-render", FIEF_MESH_SERVE = "1080,1081" }
 secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.pi]
 # Raspberry Pi at friend's house. Render locally: fief config export --node pi.
+deploy = []
 vars = { FIEF_MESH_HOSTNAME = "fief-pi", FIEF_MESH_SERVE = "", FIEF_MESH_ROUTES = "" }
 secrets = ["CHISEL_AUTH", "FIEF_MESH_KEY"]
 
 [nodes.laptop]
 # Local dev/consumer box. Same export flow as pi.
+deploy = []
 vars = { FIEF_MESH_HOSTNAME = "fief-laptop" }
 secrets = ["CHISEL_AUTH"]

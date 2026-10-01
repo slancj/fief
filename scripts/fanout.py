@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Fan out config/ to HF Space + Render. Values are NEVER printed.
+"""Fan out config/ to deploy targets. Values are NEVER printed.
+
+Targets are declared per node in config/nodes.toml (`deploy` tags); this
+script only knows the target KINDS below. Service IDs stay in env.
+Unknown --targets entries or node tags fail fast.
 
 Inputs (env, all optional per target — missing creds skip that target):
   SECRETS_JSON   path to sops-decrypted secrets.yaml as JSON (CI decrypts first)
@@ -25,6 +29,10 @@ sys.path.insert(0, str(HERE / "src"))
 from fief.config_cmd import assert_encrypted, load_nodes
 
 RENDER_API = "https://api.render.com/v1"
+
+#: Target kinds fan-out knows how to deliver to. Nodes opt in via
+#: `deploy` tags in nodes.toml — add a kind here AND document it there.
+TARGETS = ("hf-space", "render")
 
 
 def check_envelope(path: Path) -> None:
@@ -105,7 +113,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--secrets-json", default=os.environ.get("SECRETS_JSON", ""))
     p.add_argument("--nodes", default=str(HERE / "config" / "nodes.toml"))
     p.add_argument("--secrets-file", default=str(HERE / "config" / "secrets.yaml"))
-    p.add_argument("--targets", default="hf,render")
+    p.add_argument("--targets", default=",".join(TARGETS))
     p.add_argument("--dry-run", action="store_true")
     args = p.parse_args(argv)
 
@@ -118,6 +126,20 @@ def main(argv: list[str] | None = None) -> int:
     secrets = json.loads(Path(args.secrets_json).read_text())
     nodes = load_nodes(Path(args.nodes))["nodes"]
     targets = {t.strip() for t in args.targets.split(",") if t.strip()}
+    unknown_targets = targets - set(TARGETS)
+    if unknown_targets:
+        raise SystemExit(
+            f"unknown fan-out targets: {sorted(unknown_targets)} (want {list(TARGETS)})"
+        )
+    for name, node in nodes.items():
+        unknown_tags = set(node.get("deploy", [])) - set(TARGETS)
+        if unknown_tags:
+            raise SystemExit(
+                f"node {name!r} has unknown deploy tags: {sorted(unknown_tags)}"
+            )
+
+    def tagged(kind: str) -> list[tuple[str, dict]]:
+        return [(n, d) for n, d in nodes.items() if kind in d.get("deploy", [])]
 
     hf_token, space_id = (
         os.environ.get("HF_TOKEN", ""),
@@ -128,8 +150,11 @@ def main(argv: list[str] | None = None) -> int:
         os.environ.get("RENDER_SERVICE_ID", ""),
     )
 
-    if "hf" in targets:
-        if not args.dry_run and (not hf_token or "/" not in space_id):
+    if "hf-space" in targets:
+        hf_nodes = tagged("hf-space")
+        if not hf_nodes:
+            log("no node deploys to hf-space, skipped")
+        elif not args.dry_run and (not hf_token or "/" not in space_id):
             log("HF skipped (need HF_TOKEN + HF_SPACE_ID)")
         else:
             if args.dry_run:
@@ -140,23 +165,33 @@ def main(argv: list[str] | None = None) -> int:
                 from huggingface_hub import HfApi
 
                 api = HfApi(token=hf_token)
-            fanout_hf(
-                api, space_id or "<space>", nodes["hf"], secrets, args.dry_run, log
-            )
+            for name, node in hf_nodes:
+                log(f"node {name} -> space {space_id or '<space>'}")
+                fanout_hf(api, space_id or "<space>", node, secrets, args.dry_run, log)
 
     if "render" in targets:
-        if not args.dry_run and (not render_key or not service_id):
+        render_nodes = tagged("render")
+        if not render_nodes:
+            log("no node deploys to render, skipped")
+        elif not args.dry_run and (not render_key or not service_id):
             log("Render skipped (need RENDER_API_KEY + RENDER_SERVICE_ID)")
         else:
-            if (
-                fanout_render(
-                    render_key,
-                    service_id or "<service>",
-                    nodes["render"],
-                    secrets,
-                    args.dry_run,
-                    log,
+            did_any = False
+            for name, node in render_nodes:
+                log(f"node {name} -> Render {service_id or '<service>'}")
+                did_any = (
+                    fanout_render(
+                        render_key,
+                        service_id or "<service>",
+                        node,
+                        secrets,
+                        args.dry_run,
+                        log,
+                    )
+                    or did_any
                 )
+            if (
+                did_any
                 and not args.dry_run
                 and os.environ.get("RENDER_REDEPLOY", "1") == "1"
             ):

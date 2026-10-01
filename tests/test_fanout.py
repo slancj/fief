@@ -163,8 +163,8 @@ def _write_repo_files(tmp_path):
     (tmp_path / "config").mkdir()
     (tmp_path / "config" / "secrets.yaml").write_text(SOPS_BLOB)
     (tmp_path / "config" / "nodes.toml").write_text(
-        '[nodes.hf]\nvars = { FIEF_MESH_HOSTNAME = "fief-hf" }\nsecrets = ["CHISEL_AUTH"]\n'
-        '[nodes.render]\nvars = {}\nsecrets = ["CHISEL_AUTH"]\n'
+        '[nodes.hf]\ndeploy = ["hf-space"]\nvars = { FIEF_MESH_HOSTNAME = "fief-hf" }\nsecrets = ["CHISEL_AUTH"]\n'
+        '[nodes.render]\ndeploy = ["render"]\nvars = {}\nsecrets = ["CHISEL_AUTH"]\n'
     )
     secrets_json = tmp_path / "secrets.json"
     secrets_json.write_text(json.dumps({"CHISEL_AUTH": "u:S3CR3T"}))
@@ -221,3 +221,47 @@ def test_main_skips_without_creds(tmp_path, fanout, capsys):
             == 0
         )
     assert "skipped" in buf.getvalue()
+
+
+def _main_args(tmp_path, extra=()):
+    sj = tmp_path / "secrets.json"
+    return [
+        "--secrets-json",
+        str(sj),
+        "--nodes",
+        str(tmp_path / "config" / "nodes.toml"),
+        "--secrets-file",
+        str(tmp_path / "config" / "secrets.yaml"),
+        "--dry-run",
+        *extra,
+    ]
+
+
+def test_main_unknown_target_rejected(tmp_path, fanout):
+    _write_repo_files(tmp_path)
+    with pytest.raises(SystemExit, match="unknown fan-out targets"):
+        fanout.main(_main_args(tmp_path, ["--targets", "bogus"]))
+
+
+def test_main_unknown_deploy_tag_rejected(tmp_path, fanout):
+    _write_repo_files(tmp_path)
+    (tmp_path / "config" / "nodes.toml").write_text(
+        (tmp_path / "config" / "nodes.toml")
+        .read_text()
+        .replace('deploy = ["hf-space"]', 'deploy = ["bogus"]')
+    )
+    with pytest.raises(SystemExit, match="unknown deploy tags"):
+        fanout.main(_main_args(tmp_path))
+
+
+def test_main_untagged_kind_skipped(tmp_path, fanout, capsys):
+    _write_repo_files(tmp_path)
+    with redirect_stdout(io.StringIO()) as buf:
+        assert fanout.main(_main_args(tmp_path, ["--targets", "render"])) == 0
+    assert "no node deploys to" not in buf.getvalue()  # render node is tagged
+    with redirect_stdout(io.StringIO()) as buf:
+        (tmp_path / "config" / "nodes.toml").write_text(
+            '[nodes.pi]\ndeploy = []\nvars = {}\nsecrets = ["CHISEL_AUTH"]\n'
+        )
+        assert fanout.main(_main_args(tmp_path, ["--targets", "render"])) == 0
+    assert "no node deploys to render, skipped" in buf.getvalue()
