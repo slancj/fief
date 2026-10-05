@@ -1,4 +1,4 @@
-"""`fief` CLI: hub | exit | forward | mesh | up | config | version.
+"""`fief` CLI: hub | exit | forward | ssh | mesh | up | config | version.
 
 Wiring only: this module composes the tunnel and mesh parts (the only
 place allowed to import both — see tests/test_arch.py). Each command

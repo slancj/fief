@@ -9,10 +9,12 @@ them; CLI entry points wire signals when on the main thread.
 from __future__ import annotations
 
 import argparse
+import os
+import shutil
 import subprocess
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from .chisel import ensure_chisel
@@ -39,6 +41,27 @@ def register(sub: argparse._SubParsersAction) -> None:
         "same as FIEF_NO_SSH=1",
     )
     fwd.set_defaults(func=run_forward)
+    ssh_p = sub.add_parser(
+        "ssh",
+        help="shell on the hub over the chisel forward (needs `forward` running)",
+    )
+    ssh_p.add_argument(
+        "--port",
+        default="",
+        help="local forward port (default SSH_PORT or 2222)",
+    )
+    ssh_p.add_argument(
+        "--user",
+        default="",
+        help="hub login user (default SSH_USER or fief)",
+    )
+    ssh_p.add_argument(
+        "ssh_args",
+        nargs=argparse.REMAINDER,
+        help="extra args passed to ssh, e.g. `-- ls -la /tmp` "
+        "(`--` separates ssh flags like -v from fief's own)",
+    )
+    ssh_p.set_defaults(func=run_ssh)
 
 
 def run_exit(args: argparse.Namespace) -> int:
@@ -47,6 +70,10 @@ def run_exit(args: argparse.Namespace) -> int:
 
 def run_forward(args: argparse.Namespace) -> int:
     return cmd_forward(no_ssh=args.no_ssh, log=LOG.log, stop=_main_stop())
+
+
+def run_ssh(args: argparse.Namespace) -> int:
+    return cmd_ssh(port=args.port, user=args.user, ssh_args=args.ssh_args)
 
 
 def _main_stop() -> threading.Event:
@@ -83,6 +110,54 @@ def build_forward_cmd(binary: Path, cfg: ClientConfig) -> list[str]:
         cfg.hub_url,
         *remotes,
     ]
+
+
+def ssh_port_from_env() -> str:
+    """Local sshd-forward port: SSH_PORT env, else the forward default."""
+    return os.environ.get("SSH_PORT", "") or "2222"
+
+
+def ssh_user_from_env() -> str:
+    """Hub login user: SSH_USER env, else the hub default."""
+    return os.environ.get("SSH_USER", "") or "fief"
+
+
+def build_ssh_cmd(
+    port: str = "", user: str = "", ssh_args: Sequence[str] = ()
+) -> list[str]:
+    """`ssh -p <port> <user>@127.0.0.1 ...`: the other end of the
+    ``SSH_PORT:127.0.0.1:2222`` forward opened by `fief forward`."""
+    extra = list(ssh_args)
+    if extra[:1] == ["--"]:
+        extra = extra[1:]
+    return [
+        "ssh",
+        "-p",
+        port or ssh_port_from_env(),
+        f"{user or ssh_user_from_env()}@127.0.0.1",
+        *extra,
+    ]
+
+
+def cmd_ssh(
+    port: str = "",
+    user: str = "",
+    ssh_args: Sequence[str] = (),
+    log: Callable[[str], None] | None = None,
+) -> int:
+    """Exec ssh through the local forward. No chisel/auth needed here —
+    `fief forward` already holds the tunnel; this just dials localhost."""
+    emit = log or LOG.log
+    if shutil.which("ssh") is None:
+        emit("ssh binary not found (install openssh-client)")
+        return 127
+    cmd = build_ssh_cmd(port=port, user=user, ssh_args=ssh_args)
+    emit(f"running: {' '.join(cmd)}")
+    try:
+        return subprocess.run(cmd, check=False).returncode
+    except OSError as exc:
+        emit(f"ssh failed to start ({exc})")
+        return 127
 
 
 def wait_local_port(port: str, stop: threading.Event, timeout: int = 180) -> bool:

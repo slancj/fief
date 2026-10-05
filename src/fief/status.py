@@ -12,9 +12,12 @@ import urllib.parse
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from . import boxserve
+
 
 def make_handler(
     snapshot: Callable[[], tuple[str, str]],
+    hub_url: str = "",
 ) -> type[BaseHTTPRequestHandler]:
     class Handler(BaseHTTPRequestHandler):
         server_version = "fief-status"
@@ -30,6 +33,16 @@ def make_handler(
             path = urllib.parse.urlparse(self.path).path
             if path == "/health":
                 self._send(200, b"OK\n", "text/plain")
+                return
+            served = boxserve.route(
+                path,
+                host=self.headers.get("Host", ""),
+                hub_url=hub_url,
+                log=lambda msg: None,
+            )
+            if served is not None:
+                code, body, ctype = served
+                self._send(code, body, ctype)
                 return
             if path != "/":
                 self._send(404, b"Not found\n", "text/plain")
@@ -64,9 +77,12 @@ def check_listener(port: str, host: str = "127.0.0.1", timeout: float = 5) -> bo
 
 
 def serve_forever(
-    port: int, snapshot: Callable[[], tuple[str, str]], host: str = "127.0.0.1"
+    port: int,
+    snapshot: Callable[[], tuple[str, str]],
+    host: str = "127.0.0.1",
+    hub_url: str = "",
 ) -> tuple[ThreadingHTTPServer, threading.Thread]:
-    server = ThreadingHTTPServer((host, port), make_handler(snapshot))
+    server = ThreadingHTTPServer((host, port), make_handler(snapshot, hub_url))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server, thread

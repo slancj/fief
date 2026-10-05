@@ -104,14 +104,22 @@ def test_mesh_config_from_env():
 
 
 def test_mesh_config_explicitness_bits():
-    env = _env()
-    with mock.patch.dict(os.environ, env, clear=True):
+    import fief.config as config_mod
+
+    env = _env(FIEF_NO_DOTENV="1")
+    with (
+        mock.patch.dict(os.environ, env, clear=True),
+        mock.patch.object(config_mod, "_decrypted_secrets", return_value={}),
+    ):
         cfg = mesh_config_from_env()
         assert cfg.hostname_set is False
         assert cfg.accept_dns_set is False
         assert cfg.hostname == "fief-node"
-    env = _env(FIEF_MESH_HOSTNAME="", FIEF_MESH_ACCEPT_DNS="1")
-    with mock.patch.dict(os.environ, env, clear=True):
+    env = _env(FIEF_NO_DOTENV="1", FIEF_MESH_HOSTNAME="", FIEF_MESH_ACCEPT_DNS="1")
+    with (
+        mock.patch.dict(os.environ, env, clear=True),
+        mock.patch.object(config_mod, "_decrypted_secrets", return_value={}),
+    ):
         cfg = mesh_config_from_env()
         assert cfg.hostname == "fief-node"  # empty falls back
         assert cfg.hostname_set is False  # empty counts as unset

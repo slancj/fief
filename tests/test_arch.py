@@ -31,6 +31,7 @@ MESH = frozenset({"mesh_run", "mesh_fetch"})
 KERNEL = frozenset(
     {
         "__init__",
+        "boxserve",
         "config",
         "store",
         "fetch",

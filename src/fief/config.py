@@ -16,7 +16,6 @@ from __future__ import annotations
 import base64
 import os
 import shlex
-import tomllib
 from dataclasses import dataclass
 from importlib.util import find_spec
 from pathlib import Path
@@ -174,6 +173,8 @@ def _resolve_secret(name: str) -> str:
 
 def _nodes_space_id() -> str:
     """First hf-space node space_id from config/nodes.toml, else ''."""
+    import tomllib  # lazy: 3.11+ stdlib, boxes may run 3.10 (see box runbook)
+
     candidates: list[Path] = [Path.cwd() / "config" / "nodes.toml"]
     root = _repo_root()
     if root is not None:
@@ -224,6 +225,7 @@ KNOWN_VARS = frozenset(
         "BACKEND_PORT",
         "FIEF_UI",
         "FIEF_BIN_DIR",
+        "FIEF_BOX_DIR",
         "FIEF_RUN_DIR",
         "FIEF_SSH_DIR",
         "FIEF_NO_SSH",

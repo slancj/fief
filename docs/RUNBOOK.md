@@ -112,16 +112,56 @@ localhost:2222 (drop it with `--no-ssh` / `FIEF_NO_SSH=1` on hubs without
 `SSH_PUBKEY`):
 
 ```sh
-ssh -p 2222 fief@127.0.0.1    # Docker hubs (Render, Pi/compose): user fief
+fief ssh              # shell on the hub (needs `fief forward` running)
+fief ssh -- ls -la    # run a remote command instead of a login shell
+fief ssh -- -v        # `--` separates ssh flags from fief's own
+
+# Manual equivalent (Docker hubs with SSH_PUBKEY set, user fief):
+ssh -p 2222 fief@127.0.0.1
 
 # HF Space has no sshd binary — shell there is via tailnet SSH (see Mesh).
 ```
 
 Non-root hubs (HF, uid 1000) serve the container user — sshd can't setuid
-without root. Set `SSH_USER` to change the name on root-run (Docker) hubs.
+without root. Set `SSH_USER` to change the name on root-run (Docker) hubs
+(`fief ssh` reads it too; `--user` / `--port` override `SSH_USER` /
+`SSH_PORT` per invocation).
 
 Host keys regenerate on every deploy, so expect a changed-host-key prompt
 after each hub update. `SSH_PUBKEY` unset = sshd stays off, chisel-only.
+
+## Add a box (one-liner, restricted networks)
+
+Any Linux box (amd64/arm64, `sh` + `curl` + `python3 >= 3.10`, hub
+reachable) joins as a shell + mesh node with one paste. No root, no
+`uv`, no GitHub access needed on the box — the hub serves the public
+bundle (`/add.sh`, source, pinned chisel/mesh binaries), the tunnel
+carries everything else.
+
+1. Laptop: `fief config invite` prints a one-liner plus a single blob
+   (`fief config invite --name my-box` to pick the hostname, else auto
+   `fief-box-XXXX`). The blob packs `HUB_URL`, `CHISEL_AUTH`, the
+   **shared** mesh key, hostname, `FIEF_MESH_SSH=1` — treat it like a
+   secret. Mint that shared key once (stable, reusable, tagged
+   `tag:fief-box` — never `tag:fief-exit`, so route auto-approval can't
+   leak onto boxes) and store it where `invite` resolves secrets
+   (env/`.env`/secrets.yaml).
+2. Box: `curl $HUB/add.sh | sh` — verifies checksums, stages binaries
+   into the `ensure_chisel`/`ensure_mesh` layout (never re-downloads),
+   prompts for the blob, writes `box.env` (`chmod 600`), starts `exit`
+   then proxied `mesh up`, installs persistence (systemd user unit →
+   `cron @reboot` → printed re-run notice; the script reports its tier),
+   self-checks, and prints the laptop command.
+3. Console: enable the SSH toggle + grant `tag:fief-client` →
+   `tag:fief-box` (tags, never hostnames), delete stale offline entries.
+4. Laptop: `tailscale ssh fief-box-XXXX` (verify with `id -u`), services
+   via `1080` once `forward` is up.
+
+Shell here is tailnet-only by design (chisel-into-box is a later
+feature). LAN routes later: uncomment `FIEF_MESH_ROUTES` in the box's
+`box.env`, restart `box-run.sh`, approve in the console — no reinstall.
+Boxes stay out of `nodes.toml` (ephemeral, auto-named); backfill an
+entry only if a box becomes permanent.
 
 ## Mesh (nodes join the mesh)
 

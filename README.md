@@ -51,8 +51,8 @@ cp .env.example .env   # put real CHISEL_AUTH in .env, never commit it
 2. Exit node on the LAN: `uv run fief exit` (HUB_URL + CHISEL_AUTH auto-loaded)
 3. Consumer: `uv run fief forward` (same; `HUB_URL=...` overrides the default)
 4. `proxychains xfreerdp /v:<lan-ip> /u:<user>` (proxychains → port `1080`)
-5. `ssh -p 2222 fief@127.0.0.1` — shell on the hub (Docker hubs with
-   `SSH_PUBKEY` set only)
+5. `fief ssh` — shell on the hub (Docker hubs with
+   `SSH_PUBKEY` set only; needs `forward` running)
 
 ## Deploy
 

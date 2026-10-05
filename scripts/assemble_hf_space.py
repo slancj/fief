@@ -35,6 +35,7 @@ PAYLOAD_MODULES = (
     "egress.py",
     "sshd.py",
     "status.py",
+    "boxserve.py",
     "ui_gradio.py",
 )
 

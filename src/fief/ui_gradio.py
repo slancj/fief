@@ -87,7 +87,8 @@ def build_ui(
             "Consumers (forwards over one connection):\n"
             f"`HUB_URL='{hub_url}' CHISEL_AUTH='user:secret' fief forward`\n\n"
             "`1080` exits via the LAN exit node, `1081` via hub egress.\n"
-            "Add `--no-ssh` on hubs without `SSH_PUBKEY` set."
+            "Add `--no-ssh` on hubs without `SSH_PUBKEY` set.\n"
+            "Shell on Docker hubs (needs `forward` running): `fief ssh`."
         )
         refresh.click(fn=snapshot, outputs=[status_box, log_box])
         demo.load(fn=snapshot, outputs=[status_box, log_box])

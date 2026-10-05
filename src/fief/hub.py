@@ -125,6 +125,7 @@ def start_backend(
         serve_status(
             int(port_override or cfg.backend_port),
             lambda: snapshot(cfg, hub_url),
+            hub_url=hub_url,
         )
 
 
@@ -134,8 +135,13 @@ def snapshot(cfg: HubConfig, hub_url: str) -> tuple[str, str]:
 
 #: Mesh sidecar seam: wiring (cli.py, deploy shims) injects a starter;
 #: hub.py must never import the mesh part (see tests/test_arch.py).
+#: The `serve` seam is the same idea for the HTTP backend: deploy shims
+#: may inject a starter (e.g. HF serves downloads next to the UI);
+#: default is the plain status backend below.
 def main(
-    cfg: HubConfig | None = None, sidecar: Callable[[], bool] | None = None
+    cfg: HubConfig | None = None,
+    sidecar: Callable[[], bool] | None = None,
+    serve: Callable[[HubConfig, str, str], None] | None = None,
 ) -> int:
     wire_stop(STOP)
 
@@ -155,7 +161,7 @@ def main(
 
     ui = resolve_ui(cfg.ui)
     if ui != "none":
-        start_backend(cfg, ui, hub_url)
+        (serve or start_backend)(cfg, ui, hub_url)
         try:
             wait_for_backend(cfg.backend_port)
         except RuntimeError as exc:

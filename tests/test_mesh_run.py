@@ -97,6 +97,7 @@ def _cfg(**overrides):
     from unittest import mock
 
     env = {
+        "FIEF_NO_DOTENV": "1",
         "FIEF_MESH_KEY": overrides.get("authkey", "tskey-auth-TESTKEY"),
         "FIEF_MESH_HOSTNAME": overrides.get("hostname", "fief-test"),
         "FIEF_MESH_PROXY": overrides.get("proxy", ""),
@@ -112,10 +113,12 @@ def _cfg(**overrides):
         env.pop("FIEF_MESH_HOSTNAME", None)
     if "accept_dns" in overrides:
         env["FIEF_MESH_ACCEPT_DNS"] = overrides["accept_dns"]
-    # Hermetic: this helper fully specifies env, so the sops fallback must
-    # never fire (a real age key in the developer's env would leak in).
+    # Hermetic: this helper fully specifies env, so neither the local .env
+    # nor a real age key in the developer's env may leak in (clear=True
+    # drops the real environment; FIEF_NO_DOTENV=1 stops ensure_local_env
+    # from re-reading the repo .env mid-construction).
     with (
-        mock.patch.dict(os.environ, env, clear=False),
+        mock.patch.dict(os.environ, env, clear=True),
         mock.patch("fief.config._decrypted_secrets", return_value={}),
     ):
         return mesh_config_from_env()
