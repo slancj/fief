@@ -41,15 +41,37 @@ stdlib page otherwise). `$CHISEL_AUTH` is the only required secret — env var
    * `docker compose --profile hub up -d`, *or*
    * `uv run fief hub` on any Linux box.
 2. Exit node (a Linux box on the LAN, behind the firewall):
-   `CHISEL_AUTH='user:...' fief exit`.
+   `uv run fief exit` (HUB_URL defaults to the hf node in `config/nodes.toml`;
+   `CHISEL_AUTH` auto-loads from env → gitignored `.env` → sops decrypt).
    Expect `Connected`. Hub log shows a session with
    `R:127.0.0.1:1080=>socks: Listening`.
-3. Consumer: `CHISEL_AUTH='user:...' fief forward`.
-   Expect `tun: proxy#1080=>1080: Listening` then `Connected`.
-    (`--no-ssh`, or `FIEF_NO_SSH=1`, on hubs without `SSH_PUBKEY` set.)
+3. Consumer: `uv run fief forward` (same defaults; `HUB_URL=...` env overrides).
+   Expect `tun: proxy#1080=>1080: Listening` then `Connected`. `forward`
+   reconnects with backoff, so sleeping free-tier hubs wake on redial.
+    (`--no-ssh`, or `FIEF_NO_SSH=1`, on hubs without `SSH_PUBKEY` set —
+    always for HF Space, which has no sshd binary.)
 4. Use it: `proxychains xfreerdp /v:<lan-ip> /u:<user>`
    (or `proxychains curl http://<lan-ip>/` to smoke-test).
    `proxychains` must point at port `1080` for LAN exits.
+
+## One command: fief up (tunnel + mesh together)
+
+On a restricted network the mesh daemon can't dial out directly, so
+`fief up` runs the whole sequence as one supervised flow: it starts
+`forward` in the background, waits for the egress port (`1081`) to open,
+then joins as an isolated mesh node *through* it
+(`FIEF_MESH_PROXY` defaults to `socks5h://127.0.0.1:1081`; an explicit
+`FIEF_MESH_PROXY` is respected). Ctrl-C stops everything.
+
+```sh
+uv run fief up --no-ssh            # restricted net, HF hub (no sshd there)
+uv run fief up --system            # already on the tailnet: skip the tunnel,
+                                   # just configure the system daemon + serve
+```
+
+`--system` never needs `FIEF_MESH_KEY` and leaves existing prefs alone
+unless explicitly set (see Mesh). `mesh status --all` queries the
+isolated and system daemons side by side when both exist.
 
 ## Unblocked internet via hub egress
 
@@ -132,6 +154,19 @@ userspace daemon everywhere — no root, no TUN, no system changes.
    restricted, `FIEF_MESH_ROUTES=192.168.x.0/24` to expose its LAN —
    routes need admin approval, or tag auto-approvers). Persist with
    systemd/tmux.
+   Already on the tailnet (system daemon logged in)? Drive it instead of
+   spawning a second node: `uv run fief mesh up --system`
+   (same for `mesh status --system` / `mesh down --system`; no
+   `FIEF_MESH_KEY` needed — the system login is reused and a bare
+   `--system` leaves hostname/DNS/routes alone, only applying prefs you
+   explicitly set via `FIEF_MESH_*`; `FIEF_MESH_PROXY` is ignored there,
+   set the proxy on the `tailscaled` unit instead).
+   `FIEF_MESH_SOCKET` overrides the
+   socket path when it isn't the default
+   `/var/run/tailscale/tailscaled.sock`.
+   First `--system up` may report `Access denied: prefs write access
+   denied` — grant once (`sudo tailscale set --operator=$USER`), then
+   retry unprivileged.
 4. Verify: `fief mesh status` / admin console shows the nodes.
    Leave with `fief mesh down`. (`fief version` prints the build.)
    Daemon logs are quiet by default: known-routine chatter is suppressed

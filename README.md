@@ -16,7 +16,10 @@ Raspberry Pi (`compose.yaml`), or any Docker host / Linux box.
   Reconnects forever.
 * **consumer** (`fief forward`) — one client connection opens local forwards:
   `1080` (LAN via exit node), `1081` (hub-egress internet), `2222`
-  (shell on hubs with `SSH_PUBKEY` set).
+  (shell on hubs with `SSH_PUBKEY` set). Reconnects with backoff.
+* **up** (`fief up`) — both together for restricted networks: runs
+  `forward`, waits for `1081`, then joins the mesh through it.
+  `--system` skips the tunnel and drives the system daemon.
 * **mesh** (`fief mesh up`) — join this box to the mesh as a dedicated
   userspace node (proxied or direct); hubs join too when `FIEF_MESH_KEY`
   is set, serving `1080`/`1081` on their mesh IPs.
@@ -45,8 +48,8 @@ cp .env.example .env   # put real CHISEL_AUTH in .env, never commit it
 ```
 
 1. Hub: `uv run fief hub` (or deploy the image — see below)
-2. Exit node on the LAN: `CHISEL_AUTH='...' uv run fief exit`
-3. Consumer: `CHISEL_AUTH='...' uv run fief forward`
+2. Exit node on the LAN: `uv run fief exit` (HUB_URL + CHISEL_AUTH auto-loaded)
+3. Consumer: `uv run fief forward` (same; `HUB_URL=...` overrides the default)
 4. `proxychains xfreerdp /v:<lan-ip> /u:<user>` (proxychains → port `1080`)
 5. `ssh -p 2222 fief@127.0.0.1` — shell on the hub (Docker hubs with
    `SSH_PUBKEY` set only)

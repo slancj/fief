@@ -12,6 +12,7 @@ import argparse
 import threading
 import time
 import urllib.request
+from collections.abc import Callable
 from http.client import HTTPException
 from pathlib import Path
 
@@ -22,6 +23,7 @@ from .egress import start_egress_server
 from .log import LogBuffer
 from .proc import drain, spawn, wire_stop
 from .sshd import maybe_start_sshd
+from .status import check_listener
 from .status import serve_forever as serve_status
 
 LOG = LogBuffer()
@@ -31,10 +33,10 @@ _started_at = time.time()
 _chisel_state = {"running": False, "restarts": 0}
 
 
-def register(sub: argparse._SubParsersAction) -> None:
+def register(sub: argparse._SubParsersAction, func: Callable | None = None) -> None:
     sub.add_parser(
         "hub", help="run the tunnel hub (chisel server + status UI)"
-    ).set_defaults(func=run)
+    ).set_defaults(func=func or run)
 
 
 def run(args: argparse.Namespace) -> int:
@@ -45,11 +47,25 @@ def status_text(cfg: HubConfig, hub_url: str) -> str:
     uptime = int(time.time() - _started_at)
     state = "running" if _chisel_state["running"] else "restarting"
     backend = "none" if cfg.ui == "none" else f"127.0.0.1:{cfg.backend_port}"
+    # 1080 exists only while an exit node holds the hub's reverse remote;
+    # the egress listener is this process (start_egress_server).
+    lan = (
+        "attached (exit node holding 1080)"
+        if check_listener("1080")
+        else "absent (no exit node on 1080)"
+    )
+    egress = (
+        f"up (127.0.0.1:{cfg.egress_port})"
+        if check_listener(cfg.egress_port)
+        else f"down (127.0.0.1:{cfg.egress_port} closed)"
+    )
     return (
         f"fief {__version__} | chisel: {state}\n"
         f"uptime: {uptime}s\n"
         f"restarts: {_chisel_state['restarts']}\n"
         f"external port: {cfg.port} (chisel, --backend to {backend})\n"
+        f"LAN exit: {lan}\n"
+        f"hub egress: {egress}\n"
         f"public URL: {hub_url}"
     )
 
@@ -112,24 +128,15 @@ def start_backend(
         )
 
 
-def _maybe_start_tail() -> None:
-    """Mesh sidecar (hub keeps owning the foreground).
-
-    Lazy + ImportError-tolerant so minimal hosts without the module still
-    boot; absence is a clean skip, not an error.
-    """
-    try:
-        from . import mesh_run as mesh_mod
-    except ImportError:
-        return
-    mesh_mod.maybe_start_from_env(log=LOG.log, stop=STOP)
-
-
 def snapshot(cfg: HubConfig, hub_url: str) -> tuple[str, str]:
     return status_text(cfg, hub_url), LOG.snapshot()
 
 
-def main(cfg: HubConfig | None = None) -> int:
+#: Mesh sidecar seam: wiring (cli.py, deploy shims) injects a starter;
+#: hub.py must never import the mesh part (see tests/test_arch.py).
+def main(
+    cfg: HubConfig | None = None, sidecar: Callable[[], bool] | None = None
+) -> int:
     wire_stop(STOP)
 
     cfg = cfg or hub_config_from_env()
@@ -156,7 +163,8 @@ def main(cfg: HubConfig | None = None) -> int:
             return 1
 
     maybe_start_sshd(cfg.ssh_pubkey, cfg.ssh_port, cfg.ssh_user, log=LOG.log)
-    _maybe_start_tail()
+    if sidecar is not None:
+        sidecar()
     start_egress_server(cfg.egress_port, STOP, LOG.log)
     binary = ensure_chisel(cfg.version, log=LOG.log)
 

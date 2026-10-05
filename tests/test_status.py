@@ -1,6 +1,24 @@
 import urllib.request
 
-from fief.status import serve_forever
+from fief.status import check_listener, serve_forever
+
+
+def test_check_listener_open_closed():
+    import socket
+
+    srv = socket.socket()
+    srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    try:
+        assert check_listener(str(srv.getsockname()[1])) is True
+    finally:
+        srv.close()
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        closed = str(s.getsockname()[1])
+    assert check_listener(closed) is False
+    assert check_listener("notaport") is False
 
 
 def test_health_and_index():

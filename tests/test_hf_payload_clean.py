@@ -74,10 +74,11 @@ def test_excluded_modules_absent(tmp_path):
 
 
 def test_hub_still_functional(tmp_path):
-    """The denylist must not gut the hub: chisel + sidecar hook remain."""
+    """The denylist must not gut the hub: chisel + sidecar seam remain."""
     out = _assemble(tmp_path)
     hub = (out / "fief" / "hub.py").read_text()
     assert "chisel" in hub
-    assert "mesh_mod" in hub  # neutral lazy hook, ImportError-tolerant
+    assert "sidecar" in hub  # injected starter seam, never a mesh import
+    assert "mesh_run" not in hub
     chisel = (out / "fief" / "chisel.py").read_text()
     assert "chisel_" in chisel

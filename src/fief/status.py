@@ -50,6 +50,19 @@ def make_handler(
     return Handler
 
 
+def check_listener(port: str, host: str = "127.0.0.1", timeout: float = 5) -> bool:
+    """True when something accepts TCP on host:port. Kernel probe shared
+    by the hub status page (exit/egress presence) and mesh serve-target
+    checks — stdlib sockets, no new deps."""
+    import socket
+
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except (OSError, ValueError):
+        return False
+
+
 def serve_forever(
     port: int, snapshot: Callable[[], tuple[str, str]], host: str = "127.0.0.1"
 ) -> tuple[ThreadingHTTPServer, threading.Thread]:

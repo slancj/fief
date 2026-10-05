@@ -11,7 +11,14 @@ def test_subcommands():
     assert p.parse_args(["forward", "--no-ssh"]).no_ssh is True
     assert p.parse_args(["version"]).cmd == "version"
     assert p.parse_args(["mesh", "up"]).mesh_cmd == "up"
+    assert p.parse_args(["mesh", "up", "--system"]).system is True
+    assert (
+        p.parse_args(["mesh", "up", "--socket", "/tmp/x.sock"]).socket == "/tmp/x.sock"
+    )
     assert p.parse_args(["mesh", "down"]).mesh_cmd == "down"
+    assert p.parse_args(["mesh", "down", "--system"]).system is True
+    assert p.parse_args(["mesh", "status"]).mesh_cmd == "status"
+    assert p.parse_args(["mesh", "status", "--system"]).system is True
     assert p.parse_args(["mesh", "status"]).mesh_cmd == "status"
     assert p.parse_args(["mesh", "status", "--json"]).json is True
 
@@ -31,6 +38,9 @@ def test_every_subcommand_dispatches():
         ["mesh", "up"],
         ["mesh", "down"],
         ["mesh", "status"],
+        ["up"],
+        ["up", "--system"],
+        ["up", "--no-ssh"],
         ["config", "export", "--node", "hf"],
         ["config", "get", "CHISEL_AUTH"],
         ["config", "edit"],

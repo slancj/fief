@@ -1,4 +1,4 @@
-from fief.config import mesh_config_from_env
+from fief.config import DEFAULT_SYSTEM_SOCKET, mesh_config_from_env
 from fief.mesh_run import (
     MeshLogFilter,
     build_daemon_cmd,
@@ -6,6 +6,7 @@ from fief.mesh_run import (
     build_up_cmd,
     check_serve_target,
     daemon_env,
+    resolve_socket,
 )
 
 ROUTINE_SAMPLES = [
@@ -103,7 +104,14 @@ def _cfg(**overrides):
         "FIEF_MESH_ADVERTISE_EXIT": "1" if overrides.get("exit") else "0",
         "FIEF_MESH_ROUTES": ",".join(overrides.get("routes", ())),
         "FIEF_MESH_SSH": "1" if overrides.get("ssh") else "0",
+        "FIEF_MESH_SYSTEM": "1" if overrides.get("system") else "0",
+        "FIEF_MESH_SOCKET": overrides.get("socket", ""),
     }
+    if overrides.get("bare"):
+        # No hostname/DNS prefs at all: what a bare `--system` sees.
+        env.pop("FIEF_MESH_HOSTNAME", None)
+    if "accept_dns" in overrides:
+        env["FIEF_MESH_ACCEPT_DNS"] = overrides["accept_dns"]
     with mock.patch.dict(os.environ, env, clear=False):
         return mesh_config_from_env()
 
@@ -137,6 +145,137 @@ def test_build_up_cmd_ssh_opt_in(tmp_path):
 def test_build_up_cmd_ssh_default_off(tmp_path):
     cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", _cfg())
     assert "--ssh" not in cmd
+
+
+def test_build_up_cmd_omits_missing_authkey(tmp_path):
+    cfg = _cfg(authkey="")
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", cfg)
+    assert cmd[:3] == [str(tmp_path / "fiefmesh"), f"--socket={tmp_path}/sock", "up"]
+    assert "--hostname=fief-test" in cmd
+    assert not any(c.startswith("--authkey=") for c in cmd)
+
+
+def test_build_up_cmd_system_bare_leaves_prefs_alone(tmp_path):
+    cfg = _cfg(authkey="", system=True, bare=True)
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", cfg)
+    assert cmd == [
+        str(tmp_path / "fiefmesh"),
+        f"--socket={tmp_path}/sock",
+        "up",
+    ]
+
+
+def test_build_up_cmd_system_sends_explicit_prefs(tmp_path):
+    cfg = _cfg(authkey="", system=True, hostname="my-node", accept_dns="0")
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", cfg)
+    assert "--hostname=my-node" in cmd
+    assert "--accept-dns=false" in cmd
+
+
+def test_build_up_cmd_system_accept_dns_opt_in_omits_flag(tmp_path):
+    cfg = _cfg(authkey="", system=True, hostname="my-node", accept_dns="1")
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", cfg)
+    assert "--hostname=my-node" in cmd
+    assert "--accept-dns=false" not in cmd
+
+
+def test_build_up_cmd_isolated_pins_defaults(tmp_path):
+    cfg = _cfg()
+    cmd = build_up_cmd(tmp_path / "fiefmesh", tmp_path / "sock", cfg)
+    assert "--hostname=fief-test" in cmd
+    assert "--accept-dns=false" in cmd
+
+
+def test_resolve_socket(tmp_path):
+    from pathlib import Path
+
+    isolated = _cfg()
+    assert resolve_socket(isolated, tmp_path) == tmp_path / "meshd.sock"
+    system = _cfg(authkey="", system=True)
+    assert resolve_socket(system) == Path(DEFAULT_SYSTEM_SOCKET)
+    explicit = _cfg(authkey="", system=True, socket="/tmp/custom.sock")
+    assert resolve_socket(explicit) == Path("/tmp/custom.sock")
+
+
+def test_run_mesh_system_reuses_login_without_key(monkeypatch, tmp_path):
+    from fief import mesh_run
+
+    cfg = _cfg(authkey="", system=True)
+    calls: list[list[str]] = []
+
+    class _R:
+        def __init__(self, rc=0):
+            self.returncode = rc
+            self.stdout = "{}"
+            self.stderr = ""
+
+    monkeypatch.setattr(
+        mesh_run, "ensure_mesh", lambda *a, **k: (tmp_path / "cli", tmp_path / "d")
+    )
+    monkeypatch.setattr(mesh_run, "_system_cli", lambda: tmp_path / "sys-cli")
+    monkeypatch.setattr(mesh_run, "_wait_running", lambda *a, **k: None)
+
+    def fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        return _R(0)
+
+    monkeypatch.setattr(mesh_run.subprocess, "run", fake_run)
+    assert mesh_run.run_mesh(cfg, log=lambda m: None) == 0
+    up = calls[0]
+    assert up[0] == str(tmp_path / "sys-cli")
+    assert up[1] == f"--socket={DEFAULT_SYSTEM_SOCKET}"
+    assert "up" in up
+    assert not any(c.startswith("--authkey=") for c in up)
+
+
+def test_run_mesh_system_passes_key_when_set(monkeypatch, tmp_path):
+    from fief import mesh_run
+
+    cfg = _cfg(system=True)  # default TESTKEY present
+    seen: list[list[str]] = []
+
+    class _R:
+        returncode = 0
+        stdout = "{}"
+        stderr = ""
+
+    monkeypatch.setattr(
+        mesh_run, "ensure_mesh", lambda *a, **k: (tmp_path / "cli", tmp_path / "d")
+    )
+    monkeypatch.setattr(mesh_run, "_system_cli", lambda: tmp_path / "sys-cli")
+    monkeypatch.setattr(mesh_run, "_wait_running", lambda *a, **k: None)
+
+    def fake_run(cmd, **kwargs):
+        seen.append(cmd)
+        return _R()
+
+    monkeypatch.setattr(mesh_run.subprocess, "run", fake_run)
+    assert mesh_run.run_mesh(cfg, log=lambda m: None) == 0
+    assert "--authkey=tskey-auth-TESTKEY" in seen[0]
+
+
+def test_cmd_down_system_never_kills_pid(monkeypatch, tmp_path):
+    import types
+
+    from fief import mesh_run
+
+    rundir = tmp_path / "run"
+    rundir.mkdir()
+    (rundir / "meshd.pid").write_text("123456\n")
+    cfg = _cfg(authkey="", system=True)
+    monkeypatch.setattr(mesh_run, "_system_cli", lambda: tmp_path / "sys-cli")
+    monkeypatch.setattr(
+        mesh_run,
+        "ensure_mesh",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not fetch")),
+    )
+    monkeypatch.setattr(
+        mesh_run.subprocess,
+        "run",
+        lambda *a, **k: types.SimpleNamespace(returncode=0),
+    )
+    assert mesh_run.cmd_down(rundir, cfg=cfg) == 0
+    assert (rundir / "meshd.pid").exists()  # system service owns the daemon
 
 
 def test_build_serve_cmds(tmp_path):
@@ -200,3 +339,49 @@ def test_check_serve_target_garbage():
     logs: list[str] = []
     assert check_serve_target("notaport", logs.append) is False
     assert len(logs) == 1
+
+
+def test_cli_for_system_prefers_path_binary(monkeypatch, tmp_path):
+    from fief import mesh_run
+
+    monkeypatch.setattr(mesh_run, "_system_cli", lambda: tmp_path / "sys-cli")
+    monkeypatch.setattr(
+        mesh_run,
+        "ensure_mesh",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not fetch")),
+    )
+    assert mesh_run._cli_for_system(_cfg(system=True), lambda m: None) == (
+        tmp_path / "sys-cli"
+    )
+
+
+def test_cli_for_system_fetches_when_absent(monkeypatch, tmp_path):
+    from fief import mesh_run
+
+    monkeypatch.setattr(mesh_run, "_system_cli", lambda: None)
+    monkeypatch.setattr(
+        mesh_run, "ensure_mesh", lambda *a, **k: (tmp_path / "cli", tmp_path / "d")
+    )
+    assert mesh_run._cli_for_system(_cfg(system=True), lambda m: None) == (
+        tmp_path / "cli"
+    )
+
+
+def test_run_system_access_denied_hints_operator(monkeypatch, tmp_path):
+    import types
+
+    from fief import mesh_run
+
+    cfg = _cfg(authkey="", system=True)
+    monkeypatch.setattr(mesh_run, "_system_cli", lambda: tmp_path / "sys-cli")
+    monkeypatch.setattr(
+        mesh_run.subprocess,
+        "run",
+        lambda *a, **k: types.SimpleNamespace(
+            returncode=1, stdout="", stderr="Access denied: prefs write access denied"
+        ),
+    )
+    logs: list[str] = []
+    assert mesh_run.run_system(cfg, log=logs.append) == 1
+    assert any("--operator=$USER" in line for line in logs), logs
+    assert any("join failed" in line for line in logs), logs

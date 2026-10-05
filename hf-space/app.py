@@ -11,8 +11,11 @@ from dataclasses import replace
 os.environ.setdefault("PORT", "7860")  # gradio SDK exposes 7860
 
 from fief.config import hub_config_from_env
-from fief.hub import main
+from fief.hub import LOG, STOP, main
+from fief.mesh_run import maybe_start_from_env
 
 if __name__ == "__main__":
     cfg = replace(hub_config_from_env(), ui="gradio")
-    raise SystemExit(main(cfg))
+    raise SystemExit(
+        main(cfg, sidecar=lambda: maybe_start_from_env(log=LOG.log, stop=STOP))
+    )
