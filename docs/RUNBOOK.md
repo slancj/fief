@@ -146,7 +146,9 @@ carries everything else.
    `tag:fief-box` — never `tag:fief-exit`, so route auto-approval can't
    leak onto boxes) and store it where `invite` resolves secrets
    (env/`.env`/secrets.yaml).
-2. Box: `curl $HUB/add.sh | sh` — verifies checksums, stages binaries
+2. Box: `curl -fsSL $HUB/add.sh | sh` (the `-f` matters: HTTP errors
+   must fail the download, never pipe an error page into `sh`). Verifies
+   checksums, stages binaries
    into the `ensure_chisel`/`ensure_mesh` layout (never re-downloads),
    prompts for the blob, writes `box.env` (`chmod 600`), starts `exit`
    then proxied `mesh up`, installs persistence (systemd user unit →

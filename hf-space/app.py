@@ -54,14 +54,15 @@ def serve_with_downloads(cfg, ui, hub_url) -> None:
         return Response(b"OK\n", media_type="text/plain")
 
     demo = build_ui(bool(cfg.auth), hub_url, lambda: snapshot(cfg, hub_url))
-    app = FastAPI()
-    app.add_api_route("/health", health, methods=["GET"])
-    app.add_api_route("/add.sh", box_endpoint, methods=["GET"])
-    app.add_api_route("/box/{_path:path}", box_endpoint, methods=["GET"])
     try:
+        app = FastAPI()
+        app.add_api_route("/health", health, methods=["GET"])
+        app.add_api_route("/add.sh", box_endpoint, methods=["GET"])
+        app.add_api_route("/box/{_path:path}", box_endpoint, methods=["GET"])
         gr.mount_gradio_app(app, demo, path="/")
-    except AttributeError as exc:
-        LOG.log(f"gradio mount unavailable ({exc}), UI only")
+        LOG.log("box backend: UI + /add.sh + /box/* on one port")
+    except Exception as exc:  # noqa: BLE001 — a Space without downloads
+        LOG.log(f"box backend unavailable ({exc}), UI only")  # beats a 503 Space
         from fief.hub import start_backend
 
         start_backend(cfg, ui, hub_url)

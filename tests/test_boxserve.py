@@ -170,5 +170,5 @@ def test_config_invite_cli_parses_and_dispatches(capsys):
         ):
             assert cmd.cmd_invite("box-1") == 0
     out = capsys.readouterr().out
-    assert "curl https://hub.example/add.sh | sh" in out
+    assert "curl -fsSL https://hub.example/add.sh | sh" in out
     assert "BLOB" in out and "box-1" in out

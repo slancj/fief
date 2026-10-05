@@ -250,7 +250,7 @@ def cmd_invite(name: str = "") -> int:
     hostname, blob = invite_blob(name)
     hub_url = default_hub_url()
     sys.stdout.write(
-        f"on the new box, run:\n  curl {hub_url}/add.sh | sh\n"
+        f"on the new box, run:\n  curl -fsSL {hub_url}/add.sh | sh\n"
         f"paste this blob when asked (box joins as {hostname}):\n{blob}\n"
     )
     return 0
