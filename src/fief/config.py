@@ -154,13 +154,22 @@ def _decrypted_secrets() -> dict[str, str]:
         return {}
 
 
+#: Template sentinels (config/secrets.example.yaml) never count as
+#: configured — a fresh re-key leaves FIEF_MESH_KEY unfilled until the
+#: owner mints one, and that must read as "missing", not as a key.
+_PLACEHOLDER_MARK = "CHANGE_ME"
+
+
 def _resolve_secret(name: str) -> str:
     """Env -> gitignored .env -> sops decrypt. Env always wins."""
     ensure_local_env()
     val = os.environ.get(name, "")
-    if val:
+    if val and _PLACEHOLDER_MARK not in val:
         return val
-    return _decrypted_secrets().get(name, "")
+    secret = _decrypted_secrets().get(name, "")
+    if secret and _PLACEHOLDER_MARK not in secret:
+        return secret
+    return ""
 
 
 def _nodes_space_id() -> str:

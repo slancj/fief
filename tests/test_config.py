@@ -298,3 +298,24 @@ def test_mesh_config_autoloads_key_from_sops():
         ),
     ):
         assert mesh_config_from_env().authkey == "k123"
+
+
+def test_placeholder_secrets_read_as_missing():
+    import fief.config as config_mod
+
+    env = _env(
+        FIEF_NO_DOTENV="1",
+        FIEF_MESH_KEY="tskey-auth-CHANGE_ME",
+        CHISEL_AUTH="user:CHANGE_ME",
+    )
+    with (
+        mock.patch.dict(os.environ, env, clear=True),
+        mock.patch.object(
+            config_mod,
+            "_decrypted_secrets",
+            return_value={"FIEF_MESH_KEY": "tskey-auth-CHANGE_ME"},
+        ),
+    ):
+        assert mesh_config_from_env().authkey == ""
+        assert config_mod._resolve_secret("FIEF_MESH_KEY") == ""
+        assert config_mod._resolve_secret("CHISEL_AUTH") == ""

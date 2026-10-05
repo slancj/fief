@@ -5,4 +5,4 @@
 # SOPS_AGE_KEY + host key files (gitignored, see .gitignore).
 creation_rules:
   - path_regex: config/secrets\.yaml$
-    age: age1l5z6hkqxdndw9tdgyrq0yqrxnx4vxvv8n6a9t474x0kz246ajy6qau4llj
+    age: age1tulycx7vphpxkk23g8lwzclp576ahgt2jnlm2txddueqcpmlt56sy40s8m
