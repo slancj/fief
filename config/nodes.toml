@@ -10,6 +10,17 @@
 # `fief config export --node <name> > .env`. Unknown tags fail fan-out —
 # this file owns the target list, not the script.
 #
+# Roles (required per node; enforced by tests + `config export`):
+#   hub    — dialable relay: chisel server + mesh sidecar serving ports.
+#            May set FIEF_MESH_SERVE / FIEF_MESH_SSH.
+#   exit   — strict LAN door: holds the hub's reverse remote and may
+#            advertise subnet routes. Must NOT serve (no FIEF_MESH_SERVE)
+#            and stays SSH-closed unless opted in per node.
+#   client — keyless consumer (forward / up --system). Must NOT hold
+#            FIEF_MESH_KEY, serve, advertise, or route.
+# `site = "..."` is reserved (optional, any role) for grouping exits by
+# LAN later; today it is validated and passed through only.
+#
 # Per-node mesh toggles (FIEF_MESH_SSH etc.) are decided here, in each
 # node's `vars`. Fan-out pushes them as Space Variables / service env,
 # so this file is the SSH decision point — not the code. Defaults stay
@@ -18,6 +29,7 @@
 
 [nodes.hf]
 # Hugging Face Space hub. Secrets -> Space Secrets, vars -> Variables.
+role = "hub"
 deploy = ["hf-space"]
 space_id = "AlisaAjer/fief-monitor"
 vars = { FIEF_MESH_HOSTNAME = "fief-monitor", FIEF_MESH_SERVE = "1080,1081", FIEF_MESH_SSH = "1" }
@@ -25,6 +37,7 @@ secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.render]
 # Render web service (fief-relay). Secrets+vars -> service env (PUT per key).
+role = "hub"
 deploy = ["render"]
 # service_id = "srv-..."  # set when the Render service exists
 vars = { FIEF_MESH_HOSTNAME = "fief-render", FIEF_MESH_SERVE = "1080,1081" }
@@ -32,12 +45,15 @@ secrets = ["CHISEL_AUTH", "SSH_PUBKEY", "FIEF_MESH_KEY"]
 
 [nodes.pi]
 # Raspberry Pi at friend's house. Render locally: fief config export --node pi.
+# Strict door: reverse tunnel + optional routes, never serves.
+role = "exit"
 deploy = []
-vars = { FIEF_MESH_HOSTNAME = "fief-pi", FIEF_MESH_SERVE = "", FIEF_MESH_ROUTES = "" }
+vars = { FIEF_MESH_HOSTNAME = "fief-pi", FIEF_MESH_ROUTES = "" }
 secrets = ["CHISEL_AUTH", "FIEF_MESH_KEY"]
 
 [nodes.laptop]
-# Local dev/consumer box. Same export flow as pi.
+# Local dev/consumer box. Same export flow as pi. Keyless: no mesh identity.
+role = "client"
 deploy = []
 vars = { FIEF_MESH_HOSTNAME = "fief-laptop" }
 secrets = ["CHISEL_AUTH"]

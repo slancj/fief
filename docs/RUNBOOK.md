@@ -27,6 +27,29 @@ key files → `cp config/secrets.example.yaml config/secrets.yaml`, fill in,
 `sops config/secrets.yaml` (encrypts in place), commit, push.
 Fan-out refuses plaintext (sops-envelope guard) and gitleaks scans history.
 
+## Roles: hub / exit / client
+
+Every node in `nodes.toml` declares `role` (enforced by tests and
+`config export` — a node that breaks its role fails fast with the rule):
+
+| Role | Members | Job | Holds mesh key? | Serves? | SSH? |
+|---|---|---|---|---|---|
+| `hub` | hf, render | dialable relay: chisel server + mesh sidecar on `1080`/`1081` | yes (ephemeral, reusable, tagged) | `1080,1081` | opt-in per node |
+| `exit` | pi | strict LAN door: reverse tunnel + optional subnet routes | yes (stable: persistent disk) | never | closed unless opted in |
+| `client` | laptop | keyless consumer (`forward` / `up --system`) | never | never | n/a (initiates) |
+
+Tailnet side (console is source of truth, this table records intent):
+
+* Tags: `tag:fief-hub`, `tag:fief-exit`, `tag:fief-client`. Mint keys
+  per role: hubs **Ephemeral** (cloud disks forget; otherwise dead
+  entries pile up), exits stable, clients none.
+* Route auto-approvers: `tag:fief-exit` only.
+* SSH grants: `tag:fief-client` → `tag:fief-hub`, `tag:fief-exit`;
+  grant against tags, never hostnames (ephemeral reboots register as
+  new machines). Hubs never SSH each other; exits accept only clients.
+* `site = "..."` in `nodes.toml` is reserved for grouping exits by LAN
+  when a second one appears; today it is validated and passed through.
+
 Hub: `fief hub` — chisel `server --reverse --socks5` on `$PORT` (default
 8080; Render injects its own, HF shim uses 7860). Normal browser HTTP on the
 same port is proxied via `--backend` to the status UI (Gradio when installed,

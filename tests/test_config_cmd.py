@@ -1,4 +1,4 @@
-from fief.config_cmd import _shell_quote, render_dotenv
+from fief.config_cmd import _shell_quote, render_dotenv, validate_node_role
 
 
 def test_shell_quote():
@@ -12,6 +12,7 @@ def test_render_dotenv():
     nodes = {
         "nodes": {
             "pi": {
+                "role": "exit",
                 "vars": {"FIEF_MESH_HOSTNAME": "fief-pi"},
                 "secrets": ["CHISEL_AUTH"],
             }
@@ -36,4 +37,46 @@ def test_render_dotenv_missing_secret():
     import pytest
 
     with pytest.raises(SystemExit, match="missing"):
-        render_dotenv("pi", {"nodes": {"pi": {"secrets": ["X"]}}}, {})
+        render_dotenv(
+            "pi",
+            {"nodes": {"pi": {"role": "exit", "secrets": ["X"]}}},
+            {},
+        )
+
+
+def test_validate_node_role_rejects():
+    import pytest
+
+    with pytest.raises(SystemExit, match="role"):
+        validate_node_role("x", {})
+    with pytest.raises(SystemExit, match="must not set"):
+        validate_node_role(
+            "pi",
+            {"role": "exit", "vars": {"FIEF_MESH_SERVE": "1080"}, "secrets": []},
+        )
+    with pytest.raises(SystemExit, match="must not hold"):
+        validate_node_role(
+            "lap",
+            {"role": "client", "vars": {}, "secrets": ["FIEF_MESH_KEY"]},
+        )
+
+
+def test_validate_node_role_accepts():
+    # Empty placeholders and reserved site pass; hubs are unrestricted.
+    validate_node_role(
+        "pi",
+        {
+            "role": "exit",
+            "vars": {"FIEF_MESH_ROUTES": ""},
+            "secrets": ["FIEF_MESH_KEY"],
+            "site": "friend-house",
+        },
+    )
+    validate_node_role(
+        "hf",
+        {
+            "role": "hub",
+            "vars": {"FIEF_MESH_SERVE": "1080,1081"},
+            "secrets": ["FIEF_MESH_KEY"],
+        },
+    )

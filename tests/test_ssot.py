@@ -59,6 +59,32 @@ def test_nodes_vars_are_known():
         assert unknown == set(), f"node {name!r} sets unknown vars: {sorted(unknown)}"
 
 
+def test_node_roles_are_valid():
+    """Every node declares a known role and honors its contract: exits
+    never serve, clients stay keyless (no mesh key, serve, advertise, or
+    routes). `site`, when present, is a non-empty string."""
+    from fief.config_cmd import (
+        _ROLE_FORBIDDEN_SECRETS,
+        _ROLE_FORBIDDEN_VARS,
+        ROLES,
+    )
+
+    for name, node in _load_nodes().items():
+        role = node.get("role", "")
+        assert role in ROLES, f"node {name!r} needs role = one of {ROLES}"
+        site = node.get("site", "")
+        assert isinstance(site, str), f"node {name!r}: site must be a string"
+        forbidden_vars = _ROLE_FORBIDDEN_VARS[role]
+        bad = sorted(
+            k
+            for k, v in node.get("vars", {}).items()
+            if k in forbidden_vars and str(v).strip() != ""
+        )
+        assert bad == [], f"node {name!r} (role {role!r}) must not set: {bad}"
+        bad_s = sorted(set(node.get("secrets", [])) & _ROLE_FORBIDDEN_SECRETS[role])
+        assert bad_s == [], f"node {name!r} (role {role!r}) must not hold: {bad_s}"
+
+
 def test_secrets_inventory():
     """Every secret a node requires must exist in secrets.yaml AND the
     example template. Key names are plaintext under sops — no decryption,
