@@ -112,7 +112,12 @@ def _cfg(**overrides):
         env.pop("FIEF_MESH_HOSTNAME", None)
     if "accept_dns" in overrides:
         env["FIEF_MESH_ACCEPT_DNS"] = overrides["accept_dns"]
-    with mock.patch.dict(os.environ, env, clear=False):
+    # Hermetic: this helper fully specifies env, so the sops fallback must
+    # never fire (a real age key in the developer's env would leak in).
+    with (
+        mock.patch.dict(os.environ, env, clear=False),
+        mock.patch("fief.config._decrypted_secrets", return_value={}),
+    ):
         return mesh_config_from_env()
 
 
@@ -302,9 +307,11 @@ def test_build_serve_cmds(tmp_path):
 
 
 def test_run_mesh_needs_key(monkeypatch):
+    from fief import mesh_run
     from fief.mesh_run import run_mesh
 
     monkeypatch.delenv("FIEF_MESH_KEY", raising=False)
+    monkeypatch.setattr(mesh_run, "mesh_config_from_env", lambda: _cfg(authkey=""))
     assert run_mesh() == 2
 
 

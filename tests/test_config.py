@@ -122,8 +122,13 @@ def test_mesh_config_explicitness_bits():
 def test_mesh_config_system_mode():
     from pathlib import Path
 
+    import fief.config as config_mod
+
     env = _env(FIEF_MESH_SYSTEM="1", FIEF_MESH_SOCKET="/tmp/custom.sock")
-    with mock.patch.dict(os.environ, env, clear=True):
+    with (
+        mock.patch.dict(os.environ, env, clear=True),
+        mock.patch.object(config_mod, "_decrypted_secrets", return_value={}),
+    ):
         cfg = mesh_config_from_env()
         assert cfg.system is True
         assert cfg.socket == Path("/tmp/custom.sock")
