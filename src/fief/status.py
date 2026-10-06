@@ -93,7 +93,10 @@ def make_handler(
                     self.wfile.write(chunk)
                     self.wfile.flush()
             except OSError:
-                self._send(502, b"ui unavailable, retry shortly\n", "text/plain")
+                try:
+                    self._send(502, b"ui unavailable, retry shortly\n", "text/plain")
+                except OSError:
+                    pass  # client went away mid-stream; nothing to report to
 
         def do_GET(self) -> None:
             path = urllib.parse.urlparse(self.path).path
