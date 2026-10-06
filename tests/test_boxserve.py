@@ -65,6 +65,11 @@ def test_source_tgz_is_py_only(tmp_path):
     assert any(n.endswith("fief/boxserve.py") for n in names)
     assert any(n.endswith("fief/client.py") for n in names)
     assert not any("__pycache__" in n for n in names)
+    # The box boots `python -m fief` off hub disk: the bundle must carry
+    # the full client runtime (regression: hub-only subset broke boxes
+    # with "No module named fief.__main__").
+    for need in ("__main__.py", "cli.py", "client.py", "up.py", "config_cmd.py"):
+        assert any(n == f"fief/{need}" for n in names), need
     # Same extraction add.sh performs (3.14+ filters by default).
     import sys
 

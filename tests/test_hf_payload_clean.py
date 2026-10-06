@@ -60,15 +60,12 @@ def test_excluded_modules_absent(tmp_path):
     shipped = {f.name for f in (out / "fief").iterdir() if f.is_file()}
     # The shipped package IS the allowlist — no restating it here.
     assert shipped == _allowlist(), shipped ^ _allowlist()
-    for banned in (
-        "tail.py",
-        "mesh.py",
-        "cli.py",
-        "client.py",
-        "config_cmd.py",
-        "__main__.py",
-    ):
-        assert banned not in names, banned
+    # The box bundle (/box/fief.tgz) must boot `python -m fief` off hub
+    # disk, so the full client runtime ships. config_cmd stays importable
+    # (cli imports it) but inert without key + binary; the scrub test
+    # above is the real gate, and the repo itself is public.
+    for needed in ("cli.py", "client.py", "config_cmd.py", "__main__.py", "up.py"):
+        assert needed in names, needed
     assert "hub.py" in names and "app.py" in names
     assert "mesh_run.py" in names, "sidecar must ship or HF nodes never join"
 

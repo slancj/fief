@@ -334,6 +334,19 @@ supervise env FIEF_MESH_PROXY="socks5h://127.0.0.1:1081" python3 -m fief mesh up
 wait
 RUNEOF
 chmod +x box-run.sh
+# Preflight: the staged tree must boot the real CLI now, not fail later
+# inside a 10s supervisor loop where nobody reads the logs.
+PYTHONPATH="$PWD/src" python3 -c "import fief.cli, fief.client" \
+  || { echo "box runtime incomplete (hub mid-deploy? re-run shortly)" >&2; exit 1; }
+echo "preflight: fief CLI imports clean"
+# Stop any previous supervisor first: re-runs must neither stack loops
+# nor squat on 1081 with an orphaned chisel child. Patterns only ever
+# match box processes (boxes run nothing else named this way).
+pkill -f "[/]box-run.sh" 2>/dev/null || true
+pkill -f "fief exit" 2>/dev/null || true
+pkill -f "fief mesh" 2>/dev/null || true
+pkill -f "chisel client" 2>/dev/null || true
+sleep 2
 # Persistence, best effort (no root required); report the tier reached.
 UNIT_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 if command -v systemctl >/dev/null 2>&1; then
@@ -341,15 +354,21 @@ if command -v systemctl >/dev/null 2>&1; then
   printf '[Unit]\nDescription=fief box (tunnel + mesh)\nAfter=network-online.target\n[Service]\nExecStart=%s/box-run.sh\nRestart=always\nRestartSec=10\n[Install]\nWantedBy=default.target\n' "$DEST" > "$UNIT_HOME/fief-box.service"
   systemctl --user daemon-reload 2>/dev/null || true
 fi
-if command -v systemctl >/dev/null 2>&1 && systemctl --user enable --now fief-box 2>/dev/null; then
-  echo "persistence: systemd user unit"
-elif command -v crontab >/dev/null 2>&1 && { crontab -l 2>/dev/null; echo "@reboot $DEST/box-run.sh"; } | crontab - 2>/dev/null; then
+if command -v systemctl >/dev/null 2>&1 && systemctl --user enable fief-box 2>/dev/null && systemctl --user restart fief-box 2>/dev/null; then
+  echo "persistence: systemd user unit (started)"
+elif command -v crontab >/dev/null 2>&1 && ! crontab -l 2>/dev/null | grep -q "box-run.sh" && { crontab -l 2>/dev/null; echo "@reboot $DEST/box-run.sh"; } | crontab - 2>/dev/null; then
   echo "persistence: cron @reboot"
+  echo "starting tunnel + mesh in the background ..."
+  nohup "$DEST/box-run.sh" >/dev/null 2>&1 &
+elif crontab -l 2>/dev/null | grep -q "box-run.sh"; then
+  echo "persistence: cron @reboot (already installed)"
+  echo "starting tunnel + mesh in the background ..."
+  nohup "$DEST/box-run.sh" >/dev/null 2>&1 &
 else
   echo "persistence: NONE — re-run $DEST/box-run.sh after reboot"
+  echo "starting tunnel + mesh in the background ..."
+  nohup "$DEST/box-run.sh" >/dev/null 2>&1 &
 fi
-echo "starting tunnel + mesh in the background ..."
-nohup "$DEST/box-run.sh" >/dev/null 2>&1 &
 NAME="$(grep '^FIEF_MESH_HOSTNAME=' box.env | cut -d= -f2)"
 TOOL="$(printf 'dGFpbHNjYWxl' | base64 -d)"
 echo "done. On your laptop: $TOOL ssh $NAME"

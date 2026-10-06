@@ -19,24 +19,32 @@ HERE = Path(__file__).resolve().parent.parent
 # Explicit allowlist: ONLY these modules ship to HF. The mesh joiner ships
 # as mesh_fetch (scrubbed literals) + mesh_run (supervisor), plus store and
 # proc which they build on (see tests/test_hf_payload_clean.py), because the
-# hub sidecar is what joins cloud nodes to the mesh. CLI, clients, and
-# config tooling stay out.
+# hub sidecar is what joins cloud nodes to the mesh. The box bundle served
+# at /box/fief.tgz needs the FULL client runtime (cli/client/up/__main__
+# plus config_cmd, which cli imports) — the repo is public and these files
+# are scrub-clean, so serving them adds no exposure; the scrub test below
+# stays the real gate.
 PAYLOAD_MODULES = (
     "__init__.py",
-    "hub.py",
+    "__main__.py",
+    "boxserve.py",
     "chisel.py",
-    "fetch.py",
+    "cli.py",
+    "client.py",
     "config.py",
+    "config_cmd.py",
+    "egress.py",
+    "fetch.py",
+    "hub.py",
     "log.py",
-    "store.py",
-    "proc.py",
     "mesh_fetch.py",
     "mesh_run.py",
-    "egress.py",
+    "proc.py",
     "sshd.py",
     "status.py",
-    "boxserve.py",
+    "store.py",
     "ui_gradio.py",
+    "up.py",
 )
 
 
