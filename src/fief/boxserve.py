@@ -271,6 +271,8 @@ BRAND="$(printf 'dGFpbHNjYWxl' | base64 -d)"
 python3 - "$ARCH" "$MESH_VERSION" "$BRAND" <<'PYEOF'
 import hashlib, os, sys, tarfile
 arch, mesh_version, brand = sys.argv[1], sys.argv[2], sys.argv[3]
+# 3.14+ filters tar extraction by default; our archive is flat .py files.
+xf = {"filter": "data"} if sys.version_info >= (3, 12) else {}
 sums = {}
 for line in open("SHA256SUMS"):
     h, name = line.split()
@@ -284,7 +286,7 @@ check("fief.tgz", [k for k in sums if k.startswith("fief-")][0])
 check("chisel.bin", f"chisel-{arch}")
 check("mesh.tgz", f"mesh-{arch}.tgz")
 with tarfile.open("fief.tgz") as tf:
-    tf.extractall("src")
+    tf.extractall("src", **xf)
 open("bin/chisel", "wb").write(open("chisel.bin", "rb").read())
 os.chmod("bin/chisel", 0o755)
 os.makedirs("bin/mesh-bin", exist_ok=True)

@@ -57,7 +57,7 @@ def test_public_url_prefers_request_host():
     assert boxserve.public_url("", "https://fallback/") == "https://fallback"
 
 
-def test_source_tgz_is_py_only():
+def test_source_tgz_is_py_only(tmp_path):
     name, data = boxserve.source_tgz()
     assert name.startswith("fief-") and name.endswith(".tgz")
     with tarfile.open(fileobj=io.BytesIO(data)) as tf:
@@ -65,6 +65,13 @@ def test_source_tgz_is_py_only():
     assert any(n.endswith("fief/boxserve.py") for n in names)
     assert any(n.endswith("fief/client.py") for n in names)
     assert not any("__pycache__" in n for n in names)
+    # Same extraction add.sh performs (3.14+ filters by default).
+    import sys
+
+    kw = {"filter": "data"} if sys.version_info >= (3, 12) else {}
+    with tarfile.open(fileobj=io.BytesIO(data)) as tf:
+        tf.extractall(tmp_path / "src", **kw)
+    assert (tmp_path / "src" / "fief" / "client.py").exists()
 
 
 def test_route_unknown_falls_through():
