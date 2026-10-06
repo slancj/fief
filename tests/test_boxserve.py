@@ -42,11 +42,190 @@ def test_shipped_files_carry_no_vendor_signatures():
 
 def test_add_sh_bakes_hub_and_rejects_plain_http():
     sh = boxserve.add_sh("https://owner-name.hf.space")
-    assert 'HUB="${1:-https://owner-name.hf.space}"' in sh
+    assert 'HUB="https://owner-name.hf.space"' in sh
     assert "invite blob" in sh
     assert "box.env" in sh
     with pytest.raises(ValueError):
         boxserve.add_sh("http://insecure/")
+
+
+def test_add_sh_rerun_is_clean_and_noninteractive():
+    sh = boxserve.add_sh("https://owner-name.hf.space")
+    # identity preserved unless --fresh is passed
+    assert "--fresh" in sh
+    assert "keeping existing box.env" in sh
+    assert "no box.env present and no terminal" in sh
+    # staged, then the whole code tree is swapped: no stale file survives
+    assert ".stage." in sh
+    assert 'rm -rf "$DEST/src" "$DEST/bin"' in sh
+    assert "trap 'rm -rf \"$STAGE\"'" in sh
+    # preflight gates the kill: a bad bundle fails before anything live dies
+    assert sh.index("fief.cli, fief.client") < sh.index('pkill -f "fief mesh"')
+
+
+def _write_stub(path, body="#!/bin/sh\nexit 1\n"):
+    path.write_text(body)
+    path.chmod(0o755)
+
+
+def _fake_hub(root):
+    """Loopback hub artifacts: checksummed but inert (no network needed)."""
+    import hashlib
+
+    box = root / "box"
+    box.mkdir(parents=True)
+    pkg = root / "pkg" / "fief"
+    pkg.mkdir(parents=True)
+    (pkg / "cli.py").write_text("VALUE = 1\n")
+    (pkg / "client.py").write_text("VALUE = 2\n")
+    fief_tgz = box / "fief.tgz"
+    with tarfile.open(fief_tgz, "w:gz") as tf:
+        for name in ("cli.py", "client.py"):
+            p = pkg / name
+            ti = tf.gettarinfo(str(p), arcname=f"fief/{name}")
+            ti.mtime = 0
+            with open(p, "rb") as f:
+                tf.addfile(ti, io.BytesIO(f.read()))
+    chisel_bin = box / "chisel-amd64"
+    chisel_bin.write_bytes(b"fake-chisel")
+    (box / "chisel-arm64").write_bytes(b"fake-chisel")
+    mesh_tgz = box / "mesh-amd64.tgz"
+    with tarfile.open(mesh_tgz, "w") as tf:
+        ti = tarfile.TarInfo("dummy")
+        ti.size = 4
+        tf.addfile(ti, io.BytesIO(b"junk"))
+    (box / "mesh-arm64.tgz").write_bytes(mesh_tgz.read_bytes())
+    sums = []
+    for fname, data in (
+        ("fief-0.0-test.tgz", fief_tgz.read_bytes()),
+        ("chisel-amd64", chisel_bin.read_bytes()),
+        ("chisel-arm64", chisel_bin.read_bytes()),
+        ("mesh-amd64.tgz", mesh_tgz.read_bytes()),
+        ("mesh-arm64.tgz", mesh_tgz.read_bytes()),
+    ):
+        sums.append(f"{hashlib.sha256(data).hexdigest()}  {fname}")
+    (box / "SHA256SUMS").write_text("\n".join(sums) + "\n")
+    (box / "versions").write_text(
+        "CHISEL_VERSION=0.0-test\nMESH_VERSION=0.0-test\nFIEF_VERSION=0.0-test\n"
+    )
+    return box
+
+
+def _serve_hub(box_dir):
+    import functools
+    import http.server
+    import threading
+
+    handler = functools.partial(
+        http.server.SimpleHTTPRequestHandler, directory=str(box_dir.parent)
+    )
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(
+        target=server.serve_forever, kwargs={"poll_interval": 0.05}
+    )
+    thread.daemon = True
+    thread.start()
+    return server
+
+
+def _run_installer(sh_text, home, extra_path, hub_url):
+    import shutil
+    import subprocess
+
+    baked = sh_text.replace('HUB="https://hub.invalid"', f'HUB="{hub_url}"')
+    assert 'HUB="https://hub.invalid"' in sh_text  # template must carry the sentinel
+    script = home / "add.sh"
+    script.write_text(baked)
+    env = {
+        "HOME": str(home),
+        "XDG_CONFIG_HOME": str(home / ".config"),
+        "PATH": extra_path,
+    }
+    sh_bin = shutil.which("sh") or "/bin/sh"
+    return subprocess.run(
+        [sh_bin, str(script)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        env=env,
+        check=False,
+    )
+
+
+def _stub_bin(bindir):
+    for name in ("pkill", "systemctl", "crontab"):
+        _write_stub(bindir / name)
+    _write_stub(bindir / "nohup", "#!/bin/sh\nexit 0\n")
+
+
+def test_add_sh_refresh_swaps_tree_and_keeps_identity(tmp_path, monkeypatch):
+    import os as _os
+
+    hub_box = _fake_hub(tmp_path / "hub")
+    server = _serve_hub(hub_box)
+    try:
+        port = server.server_address[1]
+        home = tmp_path / "home"
+        dest = home / ".local" / "fief-box"
+        (dest / "src").mkdir(parents=True)
+        (dest / "bin").mkdir(parents=True)
+        (dest / "src" / "old_stale.py").write_text("STALE = 1\n")
+        (dest / "bin" / "old_junk").write_text("junk")
+        box_env = dest / "box.env"
+        box_env.write_text(
+            "HUB_URL=https://hub.invalid\nCHISEL_AUTH=u:s\n"
+            "FIEF_MESH_KEY=k\nFIEF_MESH_HOSTNAME=fief-box-1\n"
+        )
+        before = box_env.read_bytes()
+        bindir = tmp_path / "stubs"
+        bindir.mkdir()
+        _stub_bin(bindir)
+        monkeypatch.setenv(
+            "PATH", str(bindir) + _os.pathsep + _os.environ.get("PATH", "")
+        )
+        proc = _run_installer(
+            boxserve.add_sh("https://hub.invalid"),
+            home,
+            _os.environ["PATH"],
+            f"http://127.0.0.1:{port}",
+        )
+        assert proc.returncode == 0, proc.stderr[-2000:]
+        # swap: stale files are gone, the new tree is live
+        assert not (dest / "src" / "old_stale.py").exists()
+        assert not (dest / "bin" / "old_junk").exists()
+        assert (dest / "src" / "fief" / "cli.py").exists()
+        assert (dest / "bin" / "chisel").exists()
+        assert "FIEF_VERSION=0.0-test" in (dest / "versions").read_text()
+        # identity untouched: no blob prompt, box.env byte-identical
+        assert box_env.read_bytes() == before
+        assert not list(dest.glob(".stage.*"))
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_add_sh_failed_download_touches_nothing_live(tmp_path, monkeypatch):
+    import os as _os
+
+    home = tmp_path / "home"
+    dest = home / ".local" / "fief-box"
+    (dest / "src").mkdir(parents=True)
+    keep = dest / "src" / "keep.py"
+    keep.write_text("KEEP = 1\n")
+    bindir = tmp_path / "stubs"
+    bindir.mkdir()
+    _stub_bin(bindir)
+    monkeypatch.setenv("PATH", str(bindir) + _os.pathsep + _os.environ.get("PATH", ""))
+    proc = _run_installer(
+        boxserve.add_sh("https://hub.invalid"),
+        home,
+        _os.environ["PATH"],
+        "http://127.0.0.1:1",  # nothing listens: curl fails, set -eu aborts
+    )
+    assert proc.returncode != 0
+    assert keep.read_bytes() == b"KEEP = 1\n"
+    assert not (dest / "box-run.sh").exists()
+    assert not list(dest.glob(".stage.*"))
 
 
 def test_public_url_prefers_request_host():

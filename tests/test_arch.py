@@ -32,6 +32,7 @@ KERNEL = frozenset(
     {
         "__init__",
         "boxserve",
+        "bridge",
         "config",
         "store",
         "fetch",

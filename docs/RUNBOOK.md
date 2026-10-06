@@ -84,7 +84,12 @@ On a restricted network the mesh daemon can't dial out directly, so
 `forward` in the background, waits for the egress port (`1081`) to open,
 then joins as an isolated mesh node *through* it
 (`FIEF_MESH_PROXY` defaults to `socks5h://127.0.0.1:1081`; an explicit
-`FIEF_MESH_PROXY` is respected). Ctrl-C stops everything.
+`FIEF_MESH_PROXY` is respected). Ctrl-C stops everything. Boxes behind
+filters reach the mesh through the tunnel's SOCKS uplink this way; `mesh
+up` wraps a `socks5*` uplink in a loopback HTTP-CONNECT bridge
+automatically (`src/fief/bridge.py`) because the relay dialer only speaks
+CONNECT to its proxy target — without it, relay dials die with EOF while
+everything else works.
 
 ```sh
 uv run fief up --no-ssh            # restricted net, HF hub (no sshd there)
@@ -153,7 +158,11 @@ carries everything else.
    prompts for the blob, writes `box.env` (`chmod 600`), starts `exit`
    then proxied `mesh up`, installs persistence (systemd user unit →
    `cron @reboot` → printed re-run notice; the script reports its tier),
-   self-checks, and prints the laptop command.
+   self-checks, and prints the laptop command. Re-running the same
+   command refreshes the install cleanly (staged, verified, preflighted,
+   then swapped — stale files can't survive, failed runs touch nothing
+   live) and keeps `box.env`, so refreshes need no paste; pass `--fresh`
+   (`curl -fsSL $HUB/add.sh | sh -s -- --fresh`) to replace the identity.
 3. Console: enable the SSH toggle + grant `tag:fief-client` →
    `tag:fief-box` (tags, never hostnames), delete stale offline entries.
 4. Laptop: `tailscale ssh fief-box-XXXX` (verify with `id -u`), services

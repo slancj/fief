@@ -183,6 +183,24 @@ def daemon_env(proxy: str) -> dict[str, str]:
     }
 
 
+def proxy_for_daemon(proxy: str, emit: Callable[[str], None]) -> str:
+    """Daemon proxy URL: socks uplinks get a loopback CONNECT bridge.
+
+    The relay dialer speaks HTTP CONNECT to its proxy target, so a raw
+    socks5 URL yields instant EOF on every relay dial (the control
+    client is fine — the stdlib speaks SOCKS5). Bridge it: the daemon
+    talks CONNECT to 127.0.0.1 and the bridge relays via the uplink.
+    Plain http(s) uplinks and direct mode pass through untouched.
+    """
+    from .bridge import needs_bridge, parse_socks_upstream, start_bridge
+
+    if not proxy or not needs_bridge(proxy):
+        return proxy
+    host, port = parse_socks_upstream(proxy)
+    _, _, actual = start_bridge(host, port, log=emit)
+    return f"http://127.0.0.1:{actual}"
+
+
 def build_daemon_cmd(daemon: Path, run_dir: Path, proxy_port: str) -> list[str]:
     # --statedir is mandatory, not redundant with --state: without it the
     # daemon has no var root, so SSH host keys (and certs/taildrop) stay
@@ -335,15 +353,17 @@ def run_mesh(
     run_dir.mkdir(parents=True, exist_ok=True)
     cli, daemon = ensure_mesh(cfg.version, log=emit)
     sock = run_dir / "meshd.sock"
+    daemon_proxy = proxy_for_daemon(cfg.proxy, emit)
 
     backoff = 5
     proc: subprocess.Popen | None = None
     try:
         while not stop.is_set():
             env = dict(os.environ)
-            env.update(daemon_env(cfg.proxy))
+            env.update(daemon_env(daemon_proxy))
             emit(
-                f"starting daemon (isolated, proxy={'direct' if not cfg.proxy else cfg.proxy})"
+                "starting daemon "
+                f"(isolated, proxy={'direct' if not daemon_proxy else daemon_proxy})"
             )
             proc = spawn(build_daemon_cmd(daemon, run_dir, cfg.proxy_port), env=env)
             (run_dir / "meshd.pid").write_text(str(proc.pid) + "\n")

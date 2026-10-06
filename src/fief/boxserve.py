@@ -237,12 +237,28 @@ def sha256sums(
 
 #: Flattened layout add.sh installs, mirroring ensure_chisel/ensure_mesh
 #: so a fresh box never re-downloads: $FIEF_BIN_DIR/{chisel,mesh-bin/…}.
+#:
+#: Re-runs are clean reinstalls: artifacts land in a staging dir, are
+#: verified and preflighted there, then the old tree is stopped and
+#: swapped (no stale file survives, failed runs touch nothing live).
+#: Identity (box.env) is kept unless --fresh is passed, so refreshes
+#: are non-interactive: `curl $HUB/add.sh | sh` again is the update path.
 ADD_SH = r"""#!/bin/sh
 # fief box installer: `curl $HUB/add.sh | sh`. Needs sh + curl + base64 +
 # python3 (>=3.10). Public artifacts only come from the hub; the one secret
 # paste (`fief config invite` blob) is never logged or transmitted back.
+# Re-running refreshes the install in place and keeps box.env;
+# `curl $HUB/add.sh | sh -s -- --fresh` replaces the identity too.
 set -eu
-HUB="${1:-__HUB__}"
+HUB="__HUB__"
+FRESH=0
+for a in "$@"; do
+  case "$a" in
+    --fresh) FRESH=1 ;;
+    -*) echo "unknown flag: $a (want [--fresh])" >&2; exit 1 ;;
+    *) HUB="$a" ;;
+  esac
+done
 DEST="${HOME}/.local/fief-box"
 ARCH=""
 need() { command -v "$1" >/dev/null 2>&1 || { echo "missing: $1" >&2; exit 1; }; }
@@ -259,8 +275,16 @@ if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) e
   python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 10) else 1)' \
     || { echo "python3 >= 3.10 required" >&2; exit 1; }
 fi
-mkdir -p "$DEST/bin" "$DEST/src"
-cd "$DEST"
+mkdir -p "$DEST"
+# Leftovers of an interrupted run are staging dirs only: never live state.
+for d in "$DEST"/.stage.*; do
+  [ -e "$d" ] || continue
+  rm -rf "$d"
+done
+STAGE="$DEST/.stage.$$"
+mkdir -p "$STAGE"
+trap 'rm -rf "$STAGE"' EXIT INT TERM
+cd "$STAGE"
 curl -fsSL "$HUB/box/versions" -o versions
 curl -fsSL "$HUB/box/SHA256SUMS" -o SHA256SUMS
 curl -fsSL "$HUB/box/fief.tgz" -o fief.tgz
@@ -268,6 +292,7 @@ curl -fsSL "$HUB/box/chisel-$ARCH" -o chisel.bin
 curl -fsSL "$HUB/box/mesh-$ARCH.tgz" -o mesh.tgz
 MESH_VERSION="$(grep '^MESH_VERSION=' versions | cut -d= -f2)"
 BRAND="$(printf 'dGFpbHNjYWxl' | base64 -d)"
+mkdir -p src bin
 python3 - "$ARCH" "$MESH_VERSION" "$BRAND" <<'PYEOF'
 import hashlib, os, sys, tarfile
 arch, mesh_version, brand = sys.argv[1], sys.argv[2], sys.argv[3]
@@ -305,14 +330,58 @@ with tarfile.open("mesh.tgz") as tf:
 open("bin/mesh-bin/.version", "w").write(mesh_version + "\n")
 print("binaries staged (chisel + mesh, version-pinned)")
 PYEOF
-printf 'paste the invite blob from `fief config invite` on your laptop:\n> '
-read -r BLOB </dev/tty
-printf '%s' "$BLOB" | base64 -d > box.env
-for k in HUB_URL CHISEL_AUTH FIEF_MESH_KEY FIEF_MESH_HOSTNAME; do
-  grep -q "^$k=" box.env || { echo "blob missing $k" >&2; exit 1; }
+# Preflight the STAGED tree: a bad bundle fails here, before anything
+# live is touched — never inside a supervisor loop where nobody reads logs.
+PYTHONPATH="$STAGE/src" python3 -c "import fief.cli, fief.client" \
+  || { echo "box runtime incomplete (hub mid-deploy? re-run shortly)" >&2; exit 1; }
+echo "preflight: fief CLI imports clean"
+# Identity: keep box.env across refreshes; only --fresh (or first install)
+# prompts for the blob. Blob validation happens before the swap, so a bad
+# paste never strands the box without its old identity either.
+NEED_BLOB=0
+if [ "$FRESH" -eq 1 ] || [ ! -f "$DEST/box.env" ]; then
+  NEED_BLOB=1
+fi
+if [ "$NEED_BLOB" -eq 1 ]; then
+  if [ ! -c /dev/tty ]; then
+    echo "no box.env present and no terminal for the invite blob" >&2
+    echo "run interactively, or restore $DEST/box.env first" >&2
+    exit 1
+  fi
+  printf 'paste the invite blob from `fief config invite` on your laptop:\n> '
+  read -r BLOB </dev/tty || { echo "no blob pasted" >&2; exit 1; }
+  printf '%s' "$BLOB" | base64 -d > "$STAGE/box.env" \
+    || { echo "blob is not valid base64" >&2; exit 1; }
+  for k in HUB_URL CHISEL_AUTH FIEF_MESH_KEY FIEF_MESH_HOSTNAME; do
+    grep -q "^$k=" "$STAGE/box.env" || { echo "blob missing $k" >&2; exit 1; }
+  done
+  chmod 600 "$STAGE/box.env"
+else
+  echo "keeping existing box.env (re-run with --fresh to replace it)"
+  for k in HUB_URL CHISEL_AUTH FIEF_MESH_KEY FIEF_MESH_HOSTNAME; do
+    grep -q "^$k=" "$DEST/box.env" \
+      || { echo "existing box.env missing $k (re-run with --fresh)" >&2; exit 1; }
+  done
+fi
+# Stop any previous supervisor first: re-runs must neither stack loops
+# nor squat on 1081 with an orphaned chisel child. Patterns only ever
+# match box processes (boxes run nothing else named this way).
+pkill -f "[/]box-run.sh" 2>/dev/null || true
+pkill -f "fief exit" 2>/dev/null || true
+pkill -f "fief mesh" 2>/dev/null || true
+pkill -f "chisel client" 2>/dev/null || true
+sleep 2
+# Swap: the whole code tree is replaced, so no stale file survives.
+rm -rf "$DEST/src" "$DEST/bin"
+mv "$STAGE/src" "$DEST/src"
+mv "$STAGE/bin" "$DEST/bin"
+for f in versions SHA256SUMS fief.tgz chisel.bin mesh.tgz; do
+  mv "$STAGE/$f" "$DEST/$f"
 done
-chmod 600 box.env
-cat > box-run.sh <<'RUNEOF'
+if [ "$NEED_BLOB" -eq 1 ]; then
+  mv "$STAGE/box.env" "$DEST/box.env"
+fi
+cat > "$DEST/box-run.sh" <<'RUNEOF'
 #!/bin/sh
 # Supervised box flow: exit tunnel, then mesh through its egress proxy.
 cd "$(dirname "$0")"
@@ -333,20 +402,7 @@ wait_egress
 supervise env FIEF_MESH_PROXY="socks5h://127.0.0.1:1081" python3 -m fief mesh up &
 wait
 RUNEOF
-chmod +x box-run.sh
-# Preflight: the staged tree must boot the real CLI now, not fail later
-# inside a 10s supervisor loop where nobody reads the logs.
-PYTHONPATH="$PWD/src" python3 -c "import fief.cli, fief.client" \
-  || { echo "box runtime incomplete (hub mid-deploy? re-run shortly)" >&2; exit 1; }
-echo "preflight: fief CLI imports clean"
-# Stop any previous supervisor first: re-runs must neither stack loops
-# nor squat on 1081 with an orphaned chisel child. Patterns only ever
-# match box processes (boxes run nothing else named this way).
-pkill -f "[/]box-run.sh" 2>/dev/null || true
-pkill -f "fief exit" 2>/dev/null || true
-pkill -f "fief mesh" 2>/dev/null || true
-pkill -f "chisel client" 2>/dev/null || true
-sleep 2
+chmod +x "$DEST/box-run.sh"
 # Persistence, best effort (no root required); report the tier reached.
 UNIT_HOME="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 if command -v systemctl >/dev/null 2>&1; then
@@ -369,7 +425,7 @@ else
   echo "starting tunnel + mesh in the background ..."
   nohup "$DEST/box-run.sh" >/dev/null 2>&1 &
 fi
-NAME="$(grep '^FIEF_MESH_HOSTNAME=' box.env | cut -d= -f2)"
+NAME="$(grep '^FIEF_MESH_HOSTNAME=' "$DEST/box.env" | cut -d= -f2)"
 TOOL="$(printf 'dGFpbHNjYWxl' | base64 -d)"
 echo "done. On your laptop: $TOOL ssh $NAME"
 """

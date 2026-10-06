@@ -28,6 +28,7 @@ PAYLOAD_MODULES = (
     "__init__.py",
     "__main__.py",
     "boxserve.py",
+    "bridge.py",
     "chisel.py",
     "cli.py",
     "client.py",
